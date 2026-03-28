@@ -65,7 +65,7 @@ public class DeliveryRequest {
     // true  = Order Now  → skip slot scheduling, go straight into the queue
     // false = Schedule for Later → run through the slot scheduling algorithm
     @Column(nullable = false)
-    private boolean isImmediate;
+    private boolean immediate;
 
     // ---- Which time slot was assigned? ----
     // Only relevant when isImmediate = false (scheduled orders)
@@ -103,7 +103,7 @@ public class DeliveryRequest {
         this.orderDescription = orderDescription;
         this.priority = priority;
         this.specialInstructions = specialInstructions;
-        this.isImmediate = true;              // Order Now path
+        this.immediate = true;                // Order Now path
         this.status = DeliveryStatusEnum.PLACED;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -121,7 +121,7 @@ public class DeliveryRequest {
         this.priority = priority;
         this.specialInstructions = specialInstructions;
         this.timeSlot = timeSlot;
-        this.isImmediate = false;             // Schedule for Later path
+        this.immediate = false;               // Schedule for Later path
         this.status = DeliveryStatusEnum.PLACED;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -178,11 +178,11 @@ public class DeliveryRequest {
     }
 
     public boolean isImmediate() {
-        return isImmediate;
+        return immediate;
     }
 
     public void setImmediate(boolean immediate) {
-        isImmediate = immediate;
+        this.immediate = immediate;
     }
 
     public TimeSlot getTimeSlot() {
@@ -231,7 +231,7 @@ public class DeliveryRequest {
         return "DeliveryRequest{id=" + id +
                ", from='" + restaurantAddress +
                "', to='" + customerAddress +
-               "', immediate=" + isImmediate +
+               "', immediate=" + immediate +
                ", priority=" + priority +
                ", status=" + status + "}";
     }
