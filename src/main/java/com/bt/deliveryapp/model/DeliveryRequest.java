@@ -85,6 +85,14 @@ public class DeliveryRequest {
 
     private LocalDateTime updatedAt;
 
+    // ---- Which agent is assigned to this order? ----
+    // Null when the order is first placed — Feature 3 (route optimisation) will
+    // assign the nearest available agent and populate this field.
+    // nullable = true because no agent is assigned at booking time.
+    @ManyToOne
+    @JoinColumn(name = "agent_id")
+    private User agent;
+
     // ---- Any special delivery instructions? ----
     // e.g. "Leave at door", "Call on arrival", "No contactless"
     @Column(length = 500)
@@ -143,6 +151,14 @@ public class DeliveryRequest {
 
     public void setCustomer(User customer) {
         this.customer = customer;
+    }
+
+    public User getAgent() {
+        return agent;
+    }
+
+    public void setAgent(User agent) {
+        this.agent = agent;
     }
 
     public String getRestaurantAddress() {

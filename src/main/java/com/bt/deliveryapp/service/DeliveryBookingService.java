@@ -101,20 +101,22 @@ public class DeliveryBookingService {
         validateOrderInputs(restaurantAddress, customerAddress, orderDescription);
 
         // --- Create the delivery request ---
-        // We use the "immediate" constructor we wrote in DeliveryRequest.java.
-        // It sets: immediate = true, timeSlot = null, createdAt = now.
+        // We use the "immediate" constructor from DeliveryRequest.java.
+        // We pass Priority.HIGH because Order Now is always urgent,
+        // and null for specialInstructions (the UI can add this later).
         DeliveryRequest order = new DeliveryRequest(
                 customer,
                 restaurantAddress,
                 customerAddress,
-                orderDescription
+                orderDescription,
+                Priority.HIGH,     // immediate orders are always high priority
+                null               // no special instructions at this stage
         );
 
-        // --- Set status and priority ---
-        // Immediate orders start as PLACED and are HIGH priority.
-        // The agent assignment system (Feature 3) will pick up HIGH/URGENT orders first.
+        // --- Override status to PLACED ---
+        // The constructor already sets PLACED, but we set it explicitly here
+        // so the code is clear about what state an immediate order starts in.
         order.setStatus(DeliveryStatusEnum.PLACED);
-        order.setPriority(Priority.HIGH);
 
         // --- Save to database and return ---
         // repository.save() does an INSERT if the object has no id yet,
@@ -182,21 +184,23 @@ public class DeliveryBookingService {
 
         // --- Create the order with the slot attached ---
         // We use the "scheduled" constructor from DeliveryRequest.java.
-        // It sets: immediate = false, preferredTimeSlot = slot, createdAt = now.
+        // It sets: immediate = false, timeSlot = slot, createdAt = now.
+        // Scheduled orders are MEDIUM priority — they have a planned window,
+        // so less urgent than immediate orders.
         DeliveryRequest order = new DeliveryRequest(
                 customer,
                 restaurantAddress,
                 customerAddress,
                 orderDescription,
-                slot
+                Priority.MEDIUM,   // scheduled orders are medium priority
+                slot,              // the time slot the customer chose
+                null               // no special instructions at this stage
         );
 
-        // --- Set status and priority ---
-        // Scheduled orders start as SCHEDULED (not PLACED).
-        // They are MEDIUM priority — they have a planned window, so less urgent than
-        // immediate orders.
+        // --- Override status to SCHEDULED ---
+        // The constructor sets PLACED by default, but scheduled orders
+        // should start as SCHEDULED to distinguish them clearly.
         order.setStatus(DeliveryStatusEnum.SCHEDULED);
-        order.setPriority(Priority.MEDIUM);
 
         // --- Update the slot's booked count ---
         // This is the business rule: consuming a slot means incrementing its count.
@@ -287,8 +291,8 @@ public class DeliveryBookingService {
         // --- If the order had a slot, release it back ---
         // When a scheduled order is cancelled, the slot capacity should be freed
         // so another customer can book it.
-        if (!order.isImmediate() && order.getPreferredTimeSlot() != null) {
-            TimeSlot slot = order.getPreferredTimeSlot();
+        if (!order.isImmediate() && order.getTimeSlot() != null) {
+            TimeSlot slot = order.getTimeSlot();
             slot.setBookedCount(Math.max(0, slot.getBookedCount() - 1));  // decrement (min 0)
             slot.setAvailable(true);                                        // mark available again
             timeSlotRepository.save(slot);

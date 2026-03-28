@@ -54,4 +54,13 @@ public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest
     // Count how many active deliveries a customer currently has
     // "active" means anything that isn't DELIVERED or FAILED
     long countByCustomerAndStatusNot(User customer, DeliveryStatusEnum status);
+
+    // All orders assigned to a specific agent, newest first
+    // Used by DeliveryAgentService to show an agent their workload
+    // Spring generates: SELECT * FROM delivery_requests WHERE agent_id = ? ORDER BY created_at DESC
+    List<DeliveryRequest> findByAgentOrderByCreatedAtDesc(User agent);
+
+    // All orders for a specific agent with a specific status
+    // e.g. findByAgentAndStatus(agent, DELIVERED) → agent's completed delivery history
+    List<DeliveryRequest> findByAgentAndStatus(User agent, DeliveryStatusEnum status);
 }
