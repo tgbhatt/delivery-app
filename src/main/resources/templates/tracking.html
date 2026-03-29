@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<!--
+    tracking.html — The tracking page for Feature 4: Live Status Tracking
+    This is a Thymeleaf template — it's HTML with special "th:" attributes that
+    Spring fills in with real data before sending the page to the browser.
+
+    What this page shows:
+      1. A header with the order ID and current status badge
+      2. An order details card (addresses, description, priority, time slot)
+      3. A tracking timeline — every status change ever recorded for this order
+      4. An agent action panel — buttons to move the order to the next status
+         (only visible to agents/admins, and only if there are valid next statuses)
+
+    Data passed from TrackingController:
+      - order              → the DeliveryRequest object
+      - timeline           → List<TrackingEvent> — the history, oldest first
+      - validNextStatuses  → List<DeliveryStatusEnum> — what the agent can do next
+      - loggedInUser       → the User currently logged in
+      - isAgent            → boolean — true if AGENT or ADMIN
+      - isOwner            → boolean — true if this customer placed this order
+      - successMessage     → flash message after a successful status update (optional)
+      - errorMessage       → flash message if something went wrong (optional)
+-->
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Page title: "Order #42 — SmartDelivery" or just "Tracking" if no order loaded -->
+    <title th:text="${order != null} ? ('Order #' + ${order.id} + ' — SmartDelivery') : 'Tracking — SmartDelivery'">
+        Order Tracking — SmartDelivery
+    </title>
+
+    <!-- Bootstrap 5 CSS — gives us layout, buttons, badges, cards for free -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons — small icon font (bi-clock, bi-person, etc.) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        /* ---- Vertical Timeline ---- */
+        /* Each event in the timeline is a .timeline-item div.
+           We draw a vertical line between them using the ::before pseudo-element. */
+        .timeline-item {
+            position: relative;
+            padding-left: 44px;   /* leaves space for the dot + line on the left */
+            padding-bottom: 28px;
+        }
+
+        /* The vertical connecting line between timeline dots.
+           We hide it on the LAST item so the line doesn't hang below the last dot. */
+        .timeline-item:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 26px;
+            width: 2px;
+            height: calc(100% - 10px);
+            background-color: #dee2e6;
+        }
+
+        /* The circular dot on the left of each timeline event.
+           Its colour will be set dynamically in the template based on status. */
+        .timeline-dot {
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ============================================================ -->
+<!-- NAVBAR                                                        -->
+<!-- ============================================================ -->
+<nav class="navbar navbar-dark bg-dark px-4 py-3 shadow-sm">
+    <a class="navbar-brand fw-bold fs-5" href="/">🚚 SmartDelivery</a>
+    <!-- Show who is logged in (name + role) in the top-right corner -->
+    <span class="text-light small" th:if="${loggedInUser != null}">
+        Logged in as
+        <strong th:text="${loggedInUser.name}">User Name</strong>
+        <span class="badge bg-secondary ms-1" th:text="${loggedInUser.role}">ROLE</span>
+    </span>
+</nav>
+
+<!-- ============================================================ -->
+<!-- MAIN CONTENT                                                  -->
+<!-- ============================================================ -->
+<div class="container py-4" style="max-width: 920px;">
+
+    <!-- ---- Error: Order Not Found ---- -->
+    <!-- Shown when the order ID in the URL doesn't match any order in the DB -->
+    <div th:if="${errorMessage != null and order == null}" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <span th:text="${errorMessage}">Error message here</span>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- EVERYTHING BELOW ONLY SHOWS IF WE FOUND THE ORDER            -->
+    <!-- ============================================================ -->
+    <div th:if="${order != null}">
+
+        <!-- ---- Flash Messages (shown once after a redirect) ---- -->
+        <!-- successMessage: e.g. "✅ Order status updated to: DELIVERED" -->
+        <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show shadow-sm">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <span th:text="${successMessage}">Success message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <!-- errorMessage: e.g. "Invalid status transition: PLACED → DELIVERED" -->
+        <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show shadow-sm">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <span th:text="${errorMessage}">Error message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- HEADER: Order ID + Current Status Badge + Order Type          -->
+        <!-- ============================================================ -->
+        <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+            <h4 class="mb-0 fw-bold" th:text="'Order #' + ${order.id}">Order #42</h4>
+
+            <!--
+                Current status badge.
+                th:with creates a shorthand "s" for order.status.name() so we don't repeat it.
+                The badge colour changes based on the status:
+                  DELIVERED      → green  (bg-success)
+                  FAILED         → red    (bg-danger)
+                  OUT_FOR_DELIVERY → orange (bg-warning)
+                  ASSIGNED       → blue   (bg-primary)
+                  SCHEDULED      → teal   (bg-info)
+                  RESCHEDULED    → orange (bg-warning)
+                  PLACED         → grey   (bg-secondary)
+            -->
+            <span th:with="s=${order.status.name()}"
+                  th:class="${'badge fs-6 ' +
+                      (s == 'DELIVERED'        ? 'bg-success' :
+                      (s == 'FAILED'           ? 'bg-danger'  :
+                      (s == 'OUT_FOR_DELIVERY' ? 'bg-warning text-dark' :
+                      (s == 'ASSIGNED'         ? 'bg-primary' :
+                      (s == 'SCHEDULED'        ? 'bg-info text-dark' :
+                      (s == 'RESCHEDULED'      ? 'bg-warning text-dark' : 'bg-secondary')))))}"
+                  th:text="${#strings.replace(s, '_', ' ')}">
+                PLACED
+            </span>
+
+            <!-- Order type badge: Immediate (Order Now) vs Scheduled (for later) -->
+            <span th:if="${order.immediate}"
+                  class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                ⚡ Immediate
+            </span>
+            <span th:unless="${order.immediate}"
+                  class="badge bg-info-subtle text-info border border-info-subtle">
+                🗓 Scheduled
+            </span>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TWO-COLUMN LAYOUT: Details + Timeline  |  Agent Action Panel  -->
+        <!-- The right column (agent panel) only appears if the user is    -->
+        <!-- an agent AND there are valid next statuses to show.           -->
+        <!-- ============================================================ -->
+        <div class="row g-4">
+
+            <!-- ====================== -->
+            <!-- LEFT: Details + Timeline -->
+            <!-- ====================== -->
+            <!--
+                Column width:
+                - If agent panel is showing → col-md-7 (narrower, leaves room for panel)
+                - Otherwise               → col-12 (full width)
+            -->
+            <div th:class="${isAgent and !#lists.isEmpty(validNextStatuses)} ? 'col-md-7' : 'col-12'">
+
+                <!-- ---- Order Details Card ---- -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white fw-semibold text-dark">
+                        <i class="bi bi-box-seam me-2 text-secondary"></i>Order Details
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+
+                            <!-- From (restaurant pickup address) -->
+                            <div class="col-12">
+                                <div class="small text-muted mb-1">📦 Pickup From</div>
+                                <div class="fw-medium" th:text="${order.restaurantAddress}">123 Restaurant St</div>
+                            </div>
+
+                            <!-- To (customer's delivery address) -->
+                            <div class="col-12">
+                                <div class="small text-muted mb-1">📍 Deliver To</div>
+                                <div class="fw-medium" th:text="${order.customerAddress}">456 Customer Ave</div>
+                            </div>
+
+                            <!-- What was ordered (description) -->
+                            <div class="col-sm-6" th:if="${order.orderDescription != null and !#strings.isEmpty(order.orderDescription)}">
+                                <div class="small text-muted mb-1">🍽 Order</div>
+                                <div th:text="${order.orderDescription}">2x Butter Chicken</div>
+                            </div>
+
+                            <!-- Priority badge -->
+                            <div class="col-sm-6">
+                                <div class="small text-muted mb-1">Priority</div>
+                                <!--
+                                    Priority badge colours:
+                                      URGENT → red, HIGH → orange, MEDIUM → yellow, LOW → green
+                                -->
+                                <span th:with="p=${order.priority.name()}"
+                                      th:class="${'badge ' +
+                                          (p == 'URGENT' ? 'bg-danger' :
+                                          (p == 'HIGH'   ? 'bg-danger bg-opacity-75' :
+                                          (p == 'MEDIUM' ? 'bg-warning text-dark' : 'bg-success')))}"
+                                      th:text="${p}">HIGH</span>
+                            </div>
+
+                            <!-- Scheduled time slot (only for non-immediate orders) -->
+                            <div class="col-12" th:if="${!order.immediate and order.timeSlot != null}">
+                                <div class="small text-muted mb-1">🕐 Scheduled Slot</div>
+                                <!-- Uses the TimeSlot's human-readable "label" field e.g. "10am – 12pm" -->
+                                <div>
+                                    <span th:text="${order.timeSlot.label}">10am – 12pm</span>
+                                    <span class="text-muted small ms-1"
+                                          th:text="${'(' + #temporals.format(order.timeSlot.slotDate, 'dd MMM yyyy') + ')'}">
+                                        (30 Mar 2026)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Special delivery instructions (if any) -->
+                            <div class="col-12"
+                                 th:if="${order.specialInstructions != null and !#strings.isEmpty(order.specialInstructions)}">
+                                <div class="small text-muted mb-1">📝 Special Instructions</div>
+                                <div class="text-secondary fst-italic" th:text="${order.specialInstructions}">
+                                    Leave at door
+                                </div>
+                            </div>
+
+                            <!-- Assigned agent name (if an agent has been assigned) -->
+                            <div class="col-12" th:if="${order.agent != null}">
+                                <div class="small text-muted mb-1">🧑‍🔧 Assigned Agent</div>
+                                <!-- Agent.name is accessed via agent.user.name (Agent links to User for identity) -->
+                                <div th:text="${order.agent.user.name}">Agent Name</div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+                <!-- End order details card -->
+
+                <!-- ---- Tracking Timeline Card ---- -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white fw-semibold text-dark">
+                        <i class="bi bi-clock-history me-2 text-secondary"></i>Tracking Timeline
+                    </div>
+                    <div class="card-body pb-2">
+
+                        <!-- Empty state: no events yet (order was just placed) -->
+                        <div th:if="${#lists.isEmpty(timeline)}" class="text-center text-muted py-4">
+                            <i class="bi bi-hourglass fs-2 d-block mb-2 opacity-50"></i>
+                            <div class="fw-medium">No updates yet</div>
+                            <div class="small">This order was just placed. Check back soon.</div>
+                        </div>
+
+                        <!-- Timeline events (shown when at least one status change has been recorded) -->
+                        <div th:unless="${#lists.isEmpty(timeline)}" class="pt-2">
+
+                            <!--
+                                th:each loops over the timeline list.
+                                "event" is our variable name for each TrackingEvent in the list.
+                                Each TrackingEvent has: fromStatus, toStatus, timestamp, updatedBy, note
+                            -->
+                            <div class="timeline-item" th:each="event : ${timeline}">
+
+                                <!--
+                                    The coloured dot on the left.
+                                    Its colour matches the STATUS the order moved TO in this event.
+                                    th:with creates a shorthand "s" for the toStatus name.
+                                -->
+                                <div th:with="s=${event.toStatus.name()}"
+                                     th:class="${'timeline-dot ' +
+                                         (s == 'DELIVERED'        ? 'bg-success' :
+                                         (s == 'FAILED'           ? 'bg-danger'  :
+                                         (s == 'OUT_FOR_DELIVERY' ? 'bg-warning' :
+                                         (s == 'ASSIGNED'         ? 'bg-primary' :
+                                         (s == 'SCHEDULED'        ? 'bg-info'    :
+                                         (s == 'RESCHEDULED'      ? 'bg-warning' : 'bg-secondary'))))))}">
+                                    ✓
+                                </div>
+
+                                <!-- Status transition label: "OUT FOR DELIVERY  ← was ASSIGNED" -->
+                                <div class="mb-1">
+                                    <span class="fw-semibold"
+                                          th:text="${#strings.replace(event.toStatus.name(), '_', ' ')}">
+                                        OUT FOR DELIVERY
+                                    </span>
+                                    <span class="text-muted small ms-2"
+                                          th:text="${'← was ' + #strings.replace(event.fromStatus.name(), '_', ' ')}">
+                                        ← was ASSIGNED
+                                    </span>
+                                </div>
+
+                                <!-- When did this happen? -->
+                                <div class="small text-muted">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <!--
+                                        #temporals.format() formats a Java LocalDateTime
+                                        into a human-readable string: "28 Mar 2026, 10:30"
+                                    -->
+                                    <span th:text="${#temporals.format(event.timestamp, 'dd MMM yyyy, HH:mm')}">
+                                        28 Mar 2026, 10:30
+                                    </span>
+                                </div>
+
+                                <!-- Who made this update? (agent name, or "System" if automatic) -->
+                                <div class="small text-muted" th:if="${event.updatedBy != null}">
+                                    <i class="bi bi-person me-1"></i>Updated by
+                                    <span th:text="${event.updatedBy.name}">Agent Name</span>
+                                </div>
+                                <div class="small text-muted fst-italic" th:if="${event.updatedBy == null}">
+                                    <i class="bi bi-cpu me-1"></i>System update
+                                </div>
+
+                                <!--
+                                    Agent's note (if they left one).
+                                    We also skip it if the note is "System update" (our default for system events)
+                                    so we don't show a redundant note alongside the "System update" label above.
+                                -->
+                                <div class="mt-1 small text-secondary fst-italic"
+                                     th:if="${event.note != null
+                                             and !#strings.isEmpty(event.note)
+                                             and event.note != 'System update'}">
+                                    <i class="bi bi-chat-left-text me-1"></i>
+                                    <span th:text="${event.note}">Nobody home, tried calling.</span>
+                                </div>
+
+                            </div>
+                            <!-- end th:each -->
+                        </div>
+                        <!-- end timeline events -->
+
+                    </div>
+                </div>
+                <!-- End tracking timeline card -->
+
+            </div>
+            <!-- End left column -->
+
+            <!-- ====================== -->
+            <!-- RIGHT: Agent Action Panel -->
+            <!-- ====================== -->
+            <!--
+                This column is ONLY shown when:
+                  - The logged-in user is an agent or admin (isAgent = true), AND
+                  - There are valid next statuses for this order (the order is not yet in a terminal state)
+            -->
+            <div class="col-md-5" th:if="${isAgent and !#lists.isEmpty(validNextStatuses)}">
+
+                <div class="card shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white fw-semibold">
+                        <i class="bi bi-person-check me-2"></i>Update Order Status
+                    </div>
+                    <div class="card-body">
+
+                        <p class="text-muted small mb-3">
+                            Current status:
+                            <strong th:text="${#strings.replace(order.status.name(), '_', ' ')}">PLACED</strong>.
+                            Choose the next step below.
+                        </p>
+
+                        <!--
+                            One form per valid next status.
+                            Each form has:
+                              - A hidden input with the status value (e.g. "DELIVERED")
+                              - A text input for an optional note (required for FAILED/RESCHEDULED)
+                              - A submit button labelled "Mark as DELIVERED"
+
+                            Why one form per button?
+                            Because each button submits a different status value.
+                            Putting them all in one form would mean we'd need JavaScript.
+                            Separate forms is simpler and cleaner for a student project.
+                        -->
+                        <div th:each="nextStatus : ${validNextStatuses}" class="mb-4">
+                            <form th:action="@{/track/{id}/update(id=${order.id})}" method="post">
+
+                                <!-- Hidden field: sends the status name to the controller -->
+                                <input type="hidden" name="newStatus" th:value="${nextStatus.name()}">
+
+                                <!--
+                                    Note field.
+                                    For FAILED or RESCHEDULED: labelled as required (agents must explain why).
+                                    For other statuses: shown as optional (e.g. "Left at door").
+                                -->
+                                <div class="mb-2" th:if="${nextStatus.name() == 'FAILED' or nextStatus.name() == 'RESCHEDULED'}">
+                                    <label class="form-label small fw-medium">
+                                        Note <span class="text-danger">*</span>
+                                        <span class="text-muted fw-normal">(explain what happened)</span>
+                                    </label>
+                                    <input type="text" name="note" class="form-control form-control-sm"
+                                           placeholder="e.g. Nobody home, tried calling customer"
+                                           required>
+                                </div>
+                                <div class="mb-2" th:unless="${nextStatus.name() == 'FAILED' or nextStatus.name() == 'RESCHEDULED'}">
+                                    <label class="form-label small text-muted">Optional note</label>
+                                    <input type="text" name="note" class="form-control form-control-sm"
+                                           placeholder="e.g. Left at door (optional)">
+                                </div>
+
+                                <!--
+                                    Submit button.
+                                    Colour matches the target status:
+                                      DELIVERED      → green  (btn-success)
+                                      FAILED         → red    (btn-danger)
+                                      OUT_FOR_DELIVERY → orange (btn-warning)
+                                      Everything else → blue  (btn-primary)
+                                -->
+                                <button type="submit"
+                                        th:with="s=${nextStatus.name()}"
+                                        th:class="${'btn w-100 fw-medium ' +
+                                            (s == 'DELIVERED'        ? 'btn-success' :
+                                            (s == 'FAILED'           ? 'btn-danger'  :
+                                            (s == 'OUT_FOR_DELIVERY' ? 'btn-warning' : 'btn-primary')))}"
+                                        th:text="${'Mark as ' + #strings.replace(nextStatus.name(), '_', ' ')}">
+                                    Mark as DELIVERED
+                                </button>
+
+                            </form>
+                        </div>
+                        <!-- end th:each validNextStatuses -->
+
+                    </div>
+                </div>
+
+                <!-- Info note at the bottom of the agent panel -->
+                <div class="alert alert-light border mt-3 small text-muted mb-0">
+                    <i class="bi bi-shield-check me-1 text-success"></i>
+                    Only valid next steps are shown. The system automatically blocks invalid transitions.
+                </div>
+
+            </div>
+            <!-- End agent action panel column -->
+
+            <!-- ====================== -->
+            <!-- RIGHT: Terminal State Message (agent, but no more valid transitions) -->
+            <!-- ====================== -->
+            <!--
+                Shown when the agent is logged in but the order is already in a terminal state
+                (DELIVERED, RESCHEDULED on an immediate order, etc.) — nothing left to do.
+            -->
+            <div class="col-md-5"
+                 th:if="${isAgent and #lists.isEmpty(validNextStatuses)}">
+                <div class="card shadow-sm border-0 bg-light text-center">
+                    <div class="card-body py-4">
+                        <i class="bi bi-check2-circle fs-1 text-success d-block mb-2"></i>
+                        <div class="fw-semibold">This order is complete.</div>
+                        <div class="small text-muted mt-1">
+                            No further status updates are needed.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <!-- End two-column row -->
+
+    </div>
+    <!-- End "order found" section -->
+
+</div>
+<!-- End container -->
+
+<!-- Bootstrap 5 JS bundle (needed for the dismissible alert animation) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
