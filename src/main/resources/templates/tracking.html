@@ -152,7 +152,7 @@
                       (s == 'OUT_FOR_DELIVERY' ? 'bg-warning text-dark' :
                       (s == 'ASSIGNED'         ? 'bg-primary' :
                       (s == 'SCHEDULED'        ? 'bg-info text-dark' :
-                      (s == 'RESCHEDULED'      ? 'bg-warning text-dark' : 'bg-secondary')))))}"
+                      (s == 'RESCHEDULED'      ? 'bg-warning text-dark' : 'bg-secondary'))))))}"
                   th:text="${#strings.replace(s, '_', ' ')}">
                 PLACED
             </span>
@@ -296,8 +296,8 @@
                                          (s == 'OUT_FOR_DELIVERY' ? 'bg-warning' :
                                          (s == 'ASSIGNED'         ? 'bg-primary' :
                                          (s == 'SCHEDULED'        ? 'bg-info'    :
-                                         (s == 'RESCHEDULED'      ? 'bg-warning' : 'bg-secondary'))))))}">
-                                    ✓
+                                         (s == 'RESCHEDULED'      ? 'bg-warning' : 'bg-secondary'))))))}"
+                                    >✓
                                 </div>
 
                                 <!-- Status transition label: "OUT FOR DELIVERY  ← was ASSIGNED" -->
