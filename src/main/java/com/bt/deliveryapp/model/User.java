@@ -28,13 +28,10 @@ import jakarta.persistence.*;
  */
 @Entity
 @Table(name = "users")  // Table will be called "users" in your smartdelivery MySQL database
-public class User {
-
-    // ---- Primary Key ----
-    // Every table needs a unique ID for each row. This auto-increments: 1, 2, 3...
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class User extends BaseEntity {
+    // extends BaseEntity means User INHERITS the id field and getDisplayName() contract.
+    // The id column, getId(), and setId() are no longer needed here — they come from BaseEntity.
+    // User must implement getDisplayName() because BaseEntity declares it as abstract.
 
     // ---- User's full name ----
     // nullable = false means this column CANNOT be empty in the database
@@ -83,14 +80,6 @@ public class User {
     // This is the OOP principle of ENCAPSULATION — controlling how data is accessed.
     // A getter reads the value, a setter updates it.
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public String getName() {
         return name;
     }
@@ -134,8 +123,17 @@ public class User {
     // ---- toString ----
     // This is useful for printing/logging a User object — instead of seeing
     // "com.bt.deliveryapp.model.User@3a4621" you get readable info
+    // ---- Polymorphism — overriding the abstract method from BaseEntity -------
+    // @Override tells Java: "this method intentionally replaces the one from the parent."
+    // If the method signature doesn't match BaseEntity's, Java will give a compile error —
+    // so @Override acts as a safety check too.
+    @Override
+    public String getDisplayName() {
+        return "User: " + name + " (" + role + ")";
+    }
+
     @Override
     public String toString() {
-        return "User{id=" + id + ", name='" + name + "', email='" + email + "', role=" + role + "}";
+        return "User{id=" + getId() + ", name='" + name + "', email='" + email + "', role=" + role + "}";
     }
 }

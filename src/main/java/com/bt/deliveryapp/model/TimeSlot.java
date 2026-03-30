@@ -27,12 +27,8 @@ import java.time.LocalTime;
  */
 @Entity
 @Table(name = "time_slots")
-public class TimeSlot {
-
-    // ---- Primary Key ----
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class TimeSlot extends BaseEntity {
+    // Inherits id, getId(), setId(), and the getDisplayName() contract from BaseEntity.
 
     // ---- The date this slot is for ----
     // e.g. 2026-03-28
@@ -105,14 +101,6 @@ public class TimeSlot {
 
     // ---- Getters and Setters ----
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public LocalDate getSlotDate() {
         return slotDate;
     }
@@ -170,8 +158,13 @@ public class TimeSlot {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Slot: " + label + " on " + slotDate;
+    }
+
+    @Override
     public String toString() {
-        return "TimeSlot{id=" + id + ", date=" + slotDate +
+        return "TimeSlot{id=" + getId() + ", date=" + slotDate +
                ", " + startTime + "-" + endTime +
                ", available=" + available + "}";
     }

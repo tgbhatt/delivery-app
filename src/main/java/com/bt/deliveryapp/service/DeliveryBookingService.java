@@ -327,6 +327,53 @@ public class DeliveryBookingService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  METHOD 6: Permanently delete an order (completing CRUD — Delete)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Permanently deletes a delivery order from the database.
+     *
+     * --- Why is this different from cancelOrder()? ---
+     * cancelOrder() changes the status to FAILED — the record stays in the database.
+     * deleteOrder() physically removes the row — it is gone permanently.
+     * This completes the CRUD requirement: Create, Read, Update, DELETE.
+     *
+     * --- When is delete allowed? ---
+     * Only orders in PLACED status can be deleted.
+     * Once an order is SCHEDULED or beyond, it has slot allocations and agent
+     * assignments attached — deleting it would leave orphaned data.
+     * The customer must own the order (security check).
+     *
+     * @param orderId  the id of the order to delete
+     * @param customer the customer requesting deletion
+     * @return true if deleted successfully, false if not allowed
+     */
+    @Transactional
+    public boolean deleteOrder(Long orderId, User customer) {
+        Optional<DeliveryRequest> orderOpt = deliveryRequestRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return false;   // order does not exist
+        }
+
+        DeliveryRequest order = orderOpt.get();
+
+        // Ownership check: only the customer who placed it can delete it
+        if (!order.getCustomer().getId().equals(customer.getId())) {
+            return false;
+        }
+
+        // Only allow delete if still in PLACED status (not yet scheduled or assigned)
+        if (order.getStatus() != DeliveryStatusEnum.PLACED) {
+            return false;
+        }
+
+        // deleteById() is provided free by JpaRepository — no need to write it ourselves
+        deliveryRequestRepository.deleteById(orderId);
+        return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  PRIVATE HELPER — Input Validation
     // ─────────────────────────────────────────────────────────────────────────
 

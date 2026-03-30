@@ -28,12 +28,8 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "delivery_requests")
-public class DeliveryRequest {
-
-    // ---- Primary Key ----
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class DeliveryRequest extends BaseEntity {
+    // Inherits id, getId(), setId(), and the getDisplayName() contract from BaseEntity.
 
     // ---- Who placed this order? ----
     // Links to the users table via a foreign key column "customer_id"
@@ -137,14 +133,6 @@ public class DeliveryRequest {
 
     // ---- Getters and Setters ----
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public User getCustomer() {
         return customer;
     }
@@ -243,8 +231,13 @@ public class DeliveryRequest {
     }
 
     @Override
+    public String getDisplayName() {
+        return "Order #" + getId() + ": " + restaurantAddress + " → " + customerAddress;
+    }
+
+    @Override
     public String toString() {
-        return "DeliveryRequest{id=" + id +
+        return "DeliveryRequest{id=" + getId() +
                ", from='" + restaurantAddress +
                "', to='" + customerAddress +
                "', immediate=" + immediate +
