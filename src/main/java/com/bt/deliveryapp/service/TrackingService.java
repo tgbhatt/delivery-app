@@ -43,7 +43,7 @@ import java.util.Optional;
  * --- This is Bhavya's service (Feature 4) ---
  */
 @Service
-public class  TrackingService {
+public class TrackingService {
 
     // Spring automatically creates and injects these — we never call "new" on them
     @Autowired
