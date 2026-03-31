@@ -60,6 +60,17 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private UserRole role;
 
+    // ---- Current Location (for delivery agents) ----
+    // This represents the area/zone the agent is currently in.
+    // We store it as a simple String like "NORTH", "SOUTH", "EAST", "WEST", "CENTRAL".
+    // In a real app, this would be GPS coordinates updated in real-time from a mobile app.
+    // For our project, the admin sets this once when creating the agent account.
+    //
+    // nullable = true is fine here because CUSTOMER and ADMIN users don't have a location —
+    // only AGENT users need this field. So for non-agents it will simply be null in the database.
+    @Column(length = 50)
+    private String currentLocation;
+
     // ---- Constructors ----
     // A constructor is a special method called when you create a new User object.
     // We always need a no-argument constructor for JPA (it uses it internally).
@@ -118,6 +129,14 @@ public class User extends BaseEntity {
 
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public String getCurrentLocation() {
+        return currentLocation;
+    }
+
+    public void setCurrentLocation(String currentLocation) {
+        this.currentLocation = currentLocation;
     }
 
     // ---- toString ----

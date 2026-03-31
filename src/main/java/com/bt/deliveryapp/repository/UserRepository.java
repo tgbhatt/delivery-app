@@ -46,6 +46,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Example: finding all AGENT users to assign deliveries to them
     List<User> findByRole(UserRole role);
 
+    // Same as above but sorted A → Z by name.
+    // When the admin sees a list of agents, alphabetical order is much easier to read
+    // than random database insertion order.
+    // Spring sees "OrderByNameAsc" and adds ORDER BY name ASC to the SQL automatically.
+    List<User> findByRoleOrderByNameAsc(UserRole role);
+
+    // Find all agents in a specific location zone.
+    // e.g. findByRoleAndCurrentLocation(AGENT, "NORTH") → every agent currently in the NORTH zone.
+    // Feature 3 uses this on April 3 (zone-based matching day) to find agents
+    // physically closest to a delivery pickup address.
+    List<User> findByRoleAndCurrentLocation(UserRole role, String currentLocation);
+
     // Check if an email address is already registered — useful for signup validation
     // Returns true/false (boolean) — Spring generates: SELECT COUNT(*) FROM users WHERE email = ?
     boolean existsByEmail(String email);
