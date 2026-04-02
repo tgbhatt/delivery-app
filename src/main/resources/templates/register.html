@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Account — DeliverIQ</title>
+
+    <!-- Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #F5F5F7;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+        }
+
+        /* ── Register card ────────────────────────────────────────────── */
+        /* Simpler than login — no brand panel, just a centred card */
+        .register-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 460px;
+        }
+
+        /* ── App logo at top ──────────────────────────────────────────── */
+        .app-logo {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .app-logo .logo-icon {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .app-logo .logo-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1E3A5F;
+        }
+
+        /* ── Card headings ────────────────────────────────────────────── */
+        .register-card h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1D1D1F;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .register-card .subtext {
+            font-size: 0.875rem;
+            color: #6E6E73;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        /* ── Error / success alerts ───────────────────────────────────── */
+        .error-alert {
+            background: #FEE2E2;
+            border-left: 4px solid #DC2626;
+            color: #DC2626;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.875rem;
+            margin-bottom: 20px;
+        }
+
+        /* ── Labels ───────────────────────────────────────────────────── */
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #1D1D1F;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        /* ── Inputs ───────────────────────────────────────────────────── */
+        .form-control {
+            background: #ffffff;
+            border: 1.5px solid #E5E5EA;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            font-family: 'Inter', system-ui, sans-serif;
+            width: 100%;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #2563EB;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        /* Valid state — green border + tick */
+        .form-control.is-valid {
+            border-color: #16A34A;
+        }
+
+        /* Invalid state — red border */
+        .form-control.is-invalid {
+            border-color: #DC2626;
+        }
+
+        /* ── Inline validation messages ───────────────────────────────── */
+        .field-feedback {
+            font-size: 0.8rem;
+            margin-top: 4px;
+            min-height: 18px; /* keeps layout stable even when empty */
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .field-feedback.valid {
+            color: #16A34A;
+        }
+
+        .field-feedback.invalid {
+            color: #DC2626;
+        }
+
+        /* ── Password wrapper with eye toggle ─────────────────────────── */
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-wrapper .form-control {
+            padding-right: 42px;
+        }
+
+        .eye-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6E6E73;
+            cursor: pointer;
+            padding: 0;
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .eye-toggle:hover {
+            color: #1D1D1F;
+        }
+
+        /* ── Field spacing ────────────────────────────────────────────── */
+        .field-group {
+            margin-bottom: 16px;
+        }
+
+        /* ── Create Account button ────────────────────────────────────── */
+        .btn-register {
+            width: 100%;
+            background: #2563EB;
+            color: #ffffff;
+            border: none;
+            border-radius: 9999px;
+            padding: 10px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            font-family: 'Inter', system-ui, sans-serif;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+            margin-top: 8px;
+            margin-bottom: 20px;
+        }
+
+        .btn-register:hover {
+            background: #1D4ED8;
+        }
+
+        .btn-register:active {
+            transform: scale(0.97);
+        }
+
+        /* ── Divider ──────────────────────────────────────────────────── */
+        .divider {
+            border: none;
+            border-top: 1px solid #E5E5EA;
+            margin-bottom: 20px;
+        }
+
+        /* ── Sign in link ─────────────────────────────────────────────── */
+        .signin-text {
+            text-align: center;
+            font-size: 0.875rem;
+            color: #6E6E73;
+        }
+
+        .signin-text a {
+            color: #2563EB;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .signin-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Optional label ───────────────────────────────────────────── */
+        .optional-tag {
+            font-size: 0.75rem;
+            color: #6E6E73;
+            font-weight: 400;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="register-card">
+
+    <!-- App logo / branding at top -->
+    <div class="app-logo">
+        <span class="logo-icon">🚚</span>
+        <span class="logo-name">DeliverIQ</span>
+    </div>
+
+    <h1>Create your account</h1>
+    <p class="subtext">Get started — it takes 30 seconds</p>
+
+    <!--
+        ERROR ALERT
+        Shown when RegisterController sends back an errorMessage flash attribute.
+        e.g. "Email already exists" or "Passwords do not match"
+    -->
+    <div class="error-alert" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+    <!--
+        REGISTRATION FORM
+        All five fields are required (except phone which is optional).
+        th:action="@{/register}" builds the correct POST URL.
+    -->
+    <form th:action="@{/register}" method="post" id="registerForm" novalidate>
+
+        <!-- Full Name -->
+        <div class="field-group">
+            <label class="form-label" for="name">Full Name</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                class="form-control"
+                placeholder="Tanushree Bhatt"
+                required
+                autocomplete="name"
+                oninput="validateName()"
+            />
+            <div class="field-feedback" id="nameFeedback"></div>
+        </div>
+
+        <!-- Email Address -->
+        <div class="field-group">
+            <label class="form-label" for="email">Email Address</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                class="form-control"
+                placeholder="you@example.com"
+                required
+                autocomplete="email"
+                oninput="validateEmail()"
+            />
+            <div class="field-feedback" id="emailFeedback"></div>
+        </div>
+
+        <!-- Phone Number (optional) -->
+        <div class="field-group">
+            <label class="form-label" for="phone">
+                Phone Number
+                <span class="optional-tag">(optional)</span>
+            </label>
+            <input
+                type="tel"
+                id="phone"
+                name="phone"
+                class="form-control"
+                placeholder="9876543210"
+                autocomplete="tel"
+                oninput="validatePhone()"
+            />
+            <div class="field-feedback" id="phoneFeedback"></div>
+        </div>
+
+        <!-- Password -->
+        <div class="field-group">
+            <label class="form-label" for="password">Password</label>
+            <div class="password-wrapper">
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="form-control"
+                    placeholder="Min. 6 characters"
+                    required
+                    autocomplete="new-password"
+                    oninput="validatePassword()"
+                />
+                <button type="button" class="eye-toggle" onclick="togglePassword('password', 'eyeIcon1')">
+                    <i class="bi bi-eye" id="eyeIcon1"></i>
+                </button>
+            </div>
+            <div class="field-feedback" id="passwordFeedback"></div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="field-group">
+            <label class="form-label" for="confirmPassword">Confirm Password</label>
+            <div class="password-wrapper">
+                <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    class="form-control"
+                    placeholder="Re-enter your password"
+                    required
+                    autocomplete="new-password"
+                    oninput="validateConfirmPassword()"
+                />
+                <button type="button" class="eye-toggle" onclick="togglePassword('confirmPassword', 'eyeIcon2')">
+                    <i class="bi bi-eye" id="eyeIcon2"></i>
+                </button>
+            </div>
+            <div class="field-feedback" id="confirmFeedback"></div>
+        </div>
+
+        <!-- Create Account button -->
+        <button type="submit" class="btn-register" onclick="return validateAll()">
+            Create Account
+        </button>
+
+        <!-- Divider -->
+        <hr class="divider" />
+
+        <!-- Link back to login -->
+        <p class="signin-text">
+            Already have an account? <a th:href="@{/login}">Sign in</a>
+        </p>
+
+    </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    /**
+     * INLINE VALIDATION
+     * Each function runs when the user types in a field (oninput).
+     * Green tick + green border = valid.
+     * Red message + red border = invalid.
+     * This gives instant feedback so users know what's wrong before submitting.
+     */
+
+    function setFeedback(inputId, feedbackId, isValid, message) {
+        const input = document.getElementById(inputId);
+        const feedback = document.getElementById(feedbackId);
+
+        input.classList.remove('is-valid', 'is-invalid');
+        feedback.classList.remove('valid', 'invalid');
+        feedback.innerHTML = '';
+
+        if (message === '') return; // field not touched yet — show nothing
+
+        if (isValid) {
+            input.classList.add('is-valid');
+            feedback.classList.add('valid');
+            feedback.innerHTML = '<i class="bi bi-check-circle-fill"></i> ' + message;
+        } else {
+            input.classList.add('is-invalid');
+            feedback.classList.add('invalid');
+            feedback.innerHTML = '<i class="bi bi-x-circle-fill"></i> ' + message;
+        }
+    }
+
+    function validateName() {
+        const val = document.getElementById('name').value.trim();
+        if (val.length === 0) {
+            setFeedback('name', 'nameFeedback', false, 'Full name is required');
+        } else if (val.length < 2) {
+            setFeedback('name', 'nameFeedback', false, 'Name must be at least 2 characters');
+        } else {
+            setFeedback('name', 'nameFeedback', true, 'Looks good!');
+        }
+    }
+
+    function validateEmail() {
+        const val = document.getElementById('email').value.trim();
+        // Simple email format check using a regular expression
+        // A regex is a pattern — this one checks for "something@something.something"
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (val.length === 0) {
+            setFeedback('email', 'emailFeedback', false, 'Email address is required');
+        } else if (!emailRegex.test(val)) {
+            setFeedback('email', 'emailFeedback', false, 'Invalid email format');
+        } else {
+            setFeedback('email', 'emailFeedback', true, 'Looks good!');
+        }
+    }
+
+    function validatePhone() {
+        const val = document.getElementById('phone').value.trim();
+        if (val.length === 0) {
+            // Phone is optional — empty is fine
+            setFeedback('phone', 'phoneFeedback', false, '');
+            document.getElementById('phone').classList.remove('is-valid', 'is-invalid');
+            return;
+        }
+        // If they typed something, it should be 10 digits
+        const phoneRegex = /^\d{10}$/;
+        if (!phoneRegex.test(val)) {
+            setFeedback('phone', 'phoneFeedback', false, 'Enter a valid 10-digit number');
+        } else {
+            setFeedback('phone', 'phoneFeedback', true, 'Looks good!');
+        }
+    }
+
+    function validatePassword() {
+        const val = document.getElementById('password').value;
+        if (val.length === 0) {
+            setFeedback('password', 'passwordFeedback', false, 'Password is required');
+        } else if (val.length < 6) {
+            setFeedback('password', 'passwordFeedback', false, 'Password must be at least 6 characters');
+        } else {
+            setFeedback('password', 'passwordFeedback', true, 'Strong enough!');
+        }
+        // Re-validate confirm field if it already has a value
+        if (document.getElementById('confirmPassword').value.length > 0) {
+            validateConfirmPassword();
+        }
+    }
+
+    function validateConfirmPassword() {
+        const pass = document.getElementById('password').value;
+        const confirm = document.getElementById('confirmPassword').value;
+        if (confirm.length === 0) {
+            setFeedback('confirmPassword', 'confirmFeedback', false, 'Please confirm your password');
+        } else if (pass !== confirm) {
+            setFeedback('confirmPassword', 'confirmFeedback', false, 'Passwords do not match');
+        } else {
+            setFeedback('confirmPassword', 'confirmFeedback', true, 'Passwords match!');
+        }
+    }
+
+    /**
+     * validateAll — runs before form submission.
+     * Triggers all individual validators so the user sees all errors at once.
+     * Returns false if anything is invalid — this prevents the form from submitting.
+     */
+    function validateAll() {
+        validateName();
+        validateEmail();
+        validatePhone();
+        validatePassword();
+        validateConfirmPassword();
+
+        // Check if any field is still marked invalid
+        const hasErrors = document.querySelectorAll('.form-control.is-invalid').length > 0;
+        const nameOk = document.getElementById('name').value.trim().length >= 2;
+        const emailOk = document.getElementById('email').classList.contains('is-valid');
+        const passOk  = document.getElementById('password').classList.contains('is-valid');
+        const confirmOk = document.getElementById('confirmPassword').classList.contains('is-valid');
+
+        return nameOk && emailOk && passOk && confirmOk && !hasErrors;
+    }
+
+    /**
+     * Eye toggle — shared between password and confirm password fields.
+     * Takes the input ID and icon ID so it works for both fields.
+     */
+    function togglePassword(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    }
+</script>
+
+</body>
+</html>
