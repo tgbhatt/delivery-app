@@ -63,4 +63,17 @@ public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest
     // All orders for a specific agent with a specific status
     // e.g. findByAgentAndStatus(agent, DELIVERED) → agent's completed delivery history
     List<DeliveryRequest> findByAgentAndStatus(User agent, DeliveryStatusEnum status);
+
+    // --- Added for Feature 3 Day 3: Workload Management ---
+    //
+    // COUNT how many orders an agent has with a given status, without loading all the objects.
+    //
+    // Why add this when findByAgentAndStatus().size() already works?
+    // Because loading full objects from the database just to count them is wasteful.
+    // SQL has a COUNT(*) query that just returns a number — much faster.
+    // Spring generates: SELECT COUNT(*) FROM delivery_requests WHERE agent_id = ? AND status = ?
+    //
+    // We use this in getAgentWorkload() and getAllAgentsWorkload() to efficiently
+    // check how loaded each agent is without pulling hundreds of order records into memory.
+    long countByAgentAndStatus(User agent, DeliveryStatusEnum status);
 }
