@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In — DeliverIQ</title>
+
+    <!-- Inter font from Google Fonts (Apple SF Pro equivalent, free) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Bootstrap 5 for grid and utilities -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Bootstrap Icons for eye toggle -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
+
+    <style>
+        /* ── Base ─────────────────────────────────────────────────────── */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            height: 100vh;
+            overflow: hidden; /* no scroll — full viewport layout */
+        }
+
+        /* ── Two-column layout ────────────────────────────────────────── */
+        .login-wrapper {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* ── LEFT: Brand panel ────────────────────────────────────────── */
+        .brand-panel {
+            width: 50%;
+            background-color: #1E3A5F;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+        }
+
+        .brand-content {
+            text-align: left;
+            max-width: 340px;
+        }
+
+        .brand-logo {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .brand-name {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+        }
+
+        .brand-tagline {
+            font-size: 0.95rem;
+            color: #93b8d8;
+            margin-bottom: 32px;
+        }
+
+        .brand-bullets {
+            list-style: none;
+            padding: 0;
+        }
+
+        .brand-bullets li {
+            color: #c5dced;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-bullets li::before {
+            content: '';
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: #2563EB;
+            flex-shrink: 0;
+        }
+
+        /* ── RIGHT: Form panel ────────────────────────────────────────── */
+        .form-panel {
+            width: 50%;
+            background-color: #F5F5F7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+        }
+
+        /* ── Login card ───────────────────────────────────────────────── */
+        .login-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .login-card h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #1D1D1F;
+            margin-bottom: 6px;
+        }
+
+        .login-card .subtext {
+            font-size: 0.9rem;
+            color: #6E6E73;
+            margin-bottom: 24px;
+        }
+
+        /* ── Error alert ──────────────────────────────────────────────── */
+        .error-alert {
+            background: #FEE2E2;
+            border-left: 4px solid #DC2626;
+            color: #DC2626;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        /* ── Form labels ──────────────────────────────────────────────── */
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #1D1D1F;
+            margin-bottom: 6px;
+        }
+
+        /* ── Inputs ───────────────────────────────────────────────────── */
+        .form-control {
+            background: #ffffff;
+            border: 1.5px solid #E5E5EA;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            font-family: 'Inter', system-ui, sans-serif;
+            width: 100%;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #2563EB;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        /* ── Password wrapper (input + eye icon) ─────────────────────── */
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-wrapper .form-control {
+            padding-right: 42px; /* make room for the eye button */
+        }
+
+        .eye-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6E6E73;
+            cursor: pointer;
+            padding: 0;
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .eye-toggle:hover {
+            color: #1D1D1F;
+        }
+
+        /* ── Remember me row ──────────────────────────────────────────── */
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .remember-row label {
+            font-size: 0.85rem;
+            color: #6E6E73;
+            cursor: pointer;
+        }
+
+        /* ── Sign In button ───────────────────────────────────────────── */
+        .btn-signin {
+            width: 100%;
+            background: #2563EB;
+            color: #ffffff;
+            border: none;
+            border-radius: 9999px;
+            padding: 10px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            font-family: 'Inter', system-ui, sans-serif;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+            margin-bottom: 20px;
+        }
+
+        .btn-signin:hover {
+            background: #1D4ED8;
+        }
+
+        .btn-signin:active {
+            transform: scale(0.97);
+        }
+
+        /* ── Divider ──────────────────────────────────────────────────── */
+        .divider {
+            border: none;
+            border-top: 1px solid #E5E5EA;
+            margin-bottom: 20px;
+        }
+
+        /* ── Register link ────────────────────────────────────────────── */
+        .register-text {
+            text-align: center;
+            font-size: 0.875rem;
+            color: #6E6E73;
+        }
+
+        .register-text a {
+            color: #2563EB;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .register-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Field spacing ────────────────────────────────────────────── */
+        .field-group {
+            margin-bottom: 16px;
+        }
+
+        /* ── Responsive: stack on small screens ──────────────────────── */
+        @media (max-width: 768px) {
+            .brand-panel {
+                display: none; /* hide brand panel on mobile */
+            }
+            .form-panel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="login-wrapper">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         LEFT COLUMN — Brand Panel
+    ════════════════════════════════════════════════════════════════ -->
+    <div class="brand-panel">
+        <div class="brand-content">
+            <span class="brand-logo">🚚</span>
+            <div class="brand-name">DeliverIQ</div>
+            <div class="brand-tagline">Fast. Reliable. Real-Time.</div>
+            <ul class="brand-bullets">
+                <li>Book deliveries in seconds</li>
+                <li>Track your order live</li>
+                <li>Optimised routes, every time</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         RIGHT COLUMN — Login Form
+    ════════════════════════════════════════════════════════════════ -->
+    <div class="form-panel">
+        <div class="login-card">
+
+            <h1>Welcome back</h1>
+            <p class="subtext">Sign in to your account</p>
+
+            <!--
+                ERROR ALERT
+                th:if checks whether the 'errorMessage' attribute exists in the model.
+                If LoginController adds it as a flash attribute after a failed login,
+                Thymeleaf renders this red box. If there's no error, this div is hidden.
+            -->
+            <div class="error-alert" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <!--
+                LOGIN FORM
+                th:action="@{/login}" tells Thymeleaf to build the correct URL for POST /login.
+                method="post" sends the data in the request body (not the URL).
+            -->
+            <form th:action="@{/login}" method="post">
+
+                <!-- Email field -->
+                <div class="field-group">
+                    <label class="form-label" for="email">Email address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        class="form-control"
+                        placeholder="you@example.com"
+                        required
+                        autocomplete="email"
+                    />
+                </div>
+
+                <!-- Password field with show/hide eye toggle -->
+                <div class="field-group">
+                    <label class="form-label" for="password">Password</label>
+                    <div class="password-wrapper">
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            class="form-control"
+                            placeholder="Enter your password"
+                            required
+                            autocomplete="current-password"
+                        />
+                        <!--
+                            Eye button: clicking it calls togglePassword() below.
+                            Bootstrap Icons: bi-eye (open eye) and bi-eye-slash (crossed eye).
+                            The icon swaps between them on each click.
+                        -->
+                        <button type="button" class="eye-toggle" onclick="togglePassword()" id="eyeBtn">
+                            <i class="bi bi-eye" id="eyeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Remember me checkbox -->
+                <div class="remember-row">
+                    <input type="checkbox" id="remember" name="remember" />
+                    <label for="remember">Remember me</label>
+                </div>
+
+                <!-- Sign In button -->
+                <button type="submit" class="btn-signin">Sign In</button>
+
+                <!-- Divider -->
+                <hr class="divider" />
+
+                <!-- Link to registration -->
+                <p class="register-text">
+                    Don't have an account? <a th:href="@{/register}">Create one</a>
+                </p>
+
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<!-- Bootstrap JS (needed for some Bootstrap utilities) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    /**
+     * Toggles the password field between showing and hiding the password text.
+     *
+     * How it works:
+     * - The password input starts as type="password" — shows dots
+     * - When clicked, we change it to type="text" — shows the actual characters
+     * - We also swap the eye icon (open eye ↔ crossed eye) to give visual feedback
+     */
+    function togglePassword() {
+        const passwordInput = document.getElementById('password');
+        const eyeIcon = document.getElementById('eyeIcon');
+
+        if (passwordInput.type === 'password') {
+            // Currently hidden — show it
+            passwordInput.type = 'text';
+            eyeIcon.classList.remove('bi-eye');
+            eyeIcon.classList.add('bi-eye-slash');
+        } else {
+            // Currently visible — hide it again
+            passwordInput.type = 'password';
+            eyeIcon.classList.remove('bi-eye-slash');
+            eyeIcon.classList.add('bi-eye');
+        }
+    }
+</script>
+
+</body>
+</html>
