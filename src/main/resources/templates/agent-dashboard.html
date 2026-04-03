@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<!--
+    agent-dashboard.html — Feature 5: Agent Dashboard
+    Bhavya | feature-dashboard branch
+
+    This is the Thymeleaf template for an agent's personal view of their workload.
+
+    What the agent sees:
+      1. A "Right Now" section — immediate orders they are currently handling
+         (status: ASSIGNED or OUT_FOR_DELIVERY)
+      2. A "Today's Schedule" section — upcoming scheduled deliveries assigned to them,
+         sorted by time slot date so the earliest comes first
+      3. Each order has a link to the tracking page so the agent can update status
+
+    The agent does NOT see other agents' orders — only their own.
+    This page is intentionally lean and personal — the admin has the full overview.
+
+    Thymeleaf placeholders used here:
+      th:text="${...}       — renders a Java value as text
+      th:each="..."         — loops over a list
+      th:href="@{...}"      — generates a URL
+      th:if="${...}"        — shows element only if condition is true
+      th:unless="${...}"    — opposite of th:if
+      th:class="${...}"     — sets a class attribute dynamically
+      th:with="s=..."       — creates a local variable (used for status ternaries)
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Dashboard — SmartDelivery</title>
+    <!-- Bootstrap 5 CSS from CDN -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .section-header { font-weight: 700; font-size: 1.1rem; letter-spacing: 0.01em; }
+        .order-card { border-radius: 10px; border: 1px solid #dee2e6; }
+        .order-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .badge { font-size: 0.75rem; }
+        .order-meta { font-size: 0.82rem; color: #6c757d; }
+        .track-link { font-size: 0.82rem; }
+    </style>
+</head>
+<body>
+
+<!-- =====================================================================
+     NAVBAR
+     Shows the app name on the left, the logged-in agent's name on the right.
+     ===================================================================== -->
+<nav class="navbar navbar-dark bg-dark px-4">
+    <span class="navbar-brand fw-bold">SmartDelivery — Agent</span>
+    <span class="text-white-50 small" th:if="${loggedInUser != null}">
+        Agent:
+        <span class="text-white fw-semibold" th:text="${loggedInUser.name}">Agent</span>
+    </span>
+</nav>
+
+<div class="container mt-4" style="max-width: 900px;">
+
+    <!-- ==================================================================
+         ERROR STATE
+         Shown if the agent has a User account but no Agent profile.
+         This should not happen in normal use but we handle it gracefully.
+         ================================================================== -->
+    <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
+
+    <!-- ==================================================================
+         AGENT AVAILABILITY BADGE
+         A quick at-a-glance indicator so the agent knows their own status.
+         ================================================================== -->
+    <div th:if="${agent != null}" class="d-flex align-items-center mb-4 gap-3">
+        <h4 class="mb-0 fw-bold" th:text="'Hi, ' + ${loggedInUser.name} + ' 👋'">Hi, Agent</h4>
+        <span th:if="${agent.available}" class="badge bg-success">Available</span>
+        <span th:unless="${agent.available}" class="badge bg-secondary">Unavailable</span>
+        <span class="badge bg-primary"
+              th:text="${agent.currentDeliveryCount} + ' active delivery count'">
+        </span>
+    </div>
+
+    <!-- ==================================================================
+         SECTION 1: RIGHT NOW
+         Orders the agent is actively working on — either ASSIGNED (picked
+         up, heading to collect food) or OUT_FOR_DELIVERY (food collected,
+         heading to the customer).
+         ================================================================== -->
+    <div class="mb-5" th:if="${agent != null}">
+
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="section-header">⚡ Right Now</span>
+            <span class="badge bg-dark"
+                  th:text="${#lists.size(currentOrders)} + ' order(s)'">0</span>
+        </div>
+
+        <!-- Empty state -->
+        <div th:if="${#lists.isEmpty(currentOrders)}"
+             class="text-muted text-center py-3 bg-white rounded border">
+            Nothing active right now. Check your schedule below.
+        </div>
+
+        <!-- Order cards — one card per active order -->
+        <div th:each="order : ${currentOrders}" class="card order-card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+
+                    <!-- Left side: order info -->
+                    <div>
+                        <!-- Order ID and type badge -->
+                        <div class="mb-1">
+                            <span class="fw-bold me-2"
+                                  th:text="'Order #' + ${order.id}">Order #</span>
+                            <span class="badge bg-dark">Immediate</span>
+                        </div>
+
+                        <!-- Status badge -->
+                        <div class="mb-2">
+                            <span th:with="s=${order.status.name()}"
+                                  th:class="${'badge ' + (s == 'ASSIGNED' ? 'bg-primary' : (s == 'OUT_FOR_DELIVERY' ? 'bg-warning text-dark' : 'bg-secondary'))}"
+                                  th:text="${s}">
+                            </span>
+                        </div>
+
+                        <!-- From / To addresses -->
+                        <div class="order-meta">
+                            <div>
+                                <strong>Pick up from:</strong>
+                                <span th:text="${order.restaurantAddress}"></span>
+                            </div>
+                            <div>
+                                <strong>Deliver to:</strong>
+                                <span th:text="${order.customerAddress}"></span>
+                            </div>
+                        </div>
+
+                        <!-- Customer name -->
+                        <div class="order-meta mt-1" th:if="${order.customer != null}">
+                            <strong>Customer:</strong>
+                            <span th:text="${order.customer.name}"></span>
+                            <span th:if="${order.customer.phone != null}"
+                                  th:text="' · ' + ${order.customer.phone}"></span>
+                        </div>
+
+                        <!-- Special instructions if any -->
+                        <div class="order-meta mt-1"
+                             th:if="${order.specialInstructions != null and !order.specialInstructions.isEmpty()}">
+                            <strong>Note:</strong>
+                            <span th:text="${order.specialInstructions}"></span>
+                        </div>
+                    </div>
+
+                    <!-- Right side: priority + tracking link -->
+                    <div class="text-end">
+                        <!-- Priority badge -->
+                        <div class="mb-2">
+                            <span th:with="p=${order.priority.name()}"
+                                  th:class="${'badge ' + (p == 'HIGH' ? 'bg-danger' : (p == 'MEDIUM' ? 'bg-warning text-dark' : 'bg-secondary'))}"
+                                  th:text="${p}">
+                            </span>
+                        </div>
+                        <!-- Link to tracking page to update status -->
+                        <a th:href="@{/track/{id}(id=${order.id})}"
+                           class="btn btn-sm btn-outline-dark track-link">
+                            Update Status →
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div><!-- /th:each currentOrders -->
+
+    </div><!-- /section Right Now -->
+
+    <!-- ==================================================================
+         SECTION 2: TODAY'S SCHEDULE
+         Scheduled orders assigned to this agent, sorted chronologically
+         by time slot date. These are in SCHEDULED status — not yet started.
+         ================================================================== -->
+    <div th:if="${agent != null}">
+
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="section-header">🗓 Today's Schedule</span>
+            <span class="badge bg-secondary"
+                  th:text="${#lists.size(scheduledOrders)} + ' order(s)'">0</span>
+        </div>
+
+        <!-- Empty state -->
+        <div th:if="${#lists.isEmpty(scheduledOrders)}"
+             class="text-muted text-center py-3 bg-white rounded border">
+            No scheduled deliveries assigned to you yet.
+        </div>
+
+        <!-- Scheduled order cards -->
+        <div th:each="order : ${scheduledOrders}" class="card order-card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+
+                    <!-- Left side: order info -->
+                    <div>
+                        <!-- Order ID and type badge -->
+                        <div class="mb-1">
+                            <span class="fw-bold me-2"
+                                  th:text="'Order #' + ${order.id}">Order #</span>
+                            <span class="badge bg-secondary">Scheduled</span>
+                        </div>
+
+                        <!-- Status badge -->
+                        <div class="mb-2">
+                            <span th:with="s=${order.status.name()}"
+                                  th:class="${'badge ' + (s == 'SCHEDULED' ? 'bg-info text-dark' : (s == 'ASSIGNED' ? 'bg-primary' : (s == 'RESCHEDULED' ? 'bg-warning text-dark' : 'bg-secondary')))}"
+                                  th:text="${s}">
+                            </span>
+                        </div>
+
+                        <!-- Time slot info — the window this delivery must happen in -->
+                        <div class="order-meta mb-2" th:if="${order.timeSlot != null}">
+                            <span class="badge bg-light text-dark border">
+                                📅 <span th:text="${order.timeSlot.slotDate}"></span>
+                                &nbsp;
+                                <span th:text="${order.timeSlot.label}"></span>
+                            </span>
+                        </div>
+
+                        <!-- From / To addresses -->
+                        <div class="order-meta">
+                            <div>
+                                <strong>Pick up from:</strong>
+                                <span th:text="${order.restaurantAddress}"></span>
+                            </div>
+                            <div>
+                                <strong>Deliver to:</strong>
+                                <span th:text="${order.customerAddress}"></span>
+                            </div>
+                        </div>
+
+                        <!-- Customer name -->
+                        <div class="order-meta mt-1" th:if="${order.customer != null}">
+                            <strong>Customer:</strong>
+                            <span th:text="${order.customer.name}"></span>
+                            <span th:if="${order.customer.phone != null}"
+                                  th:text="' · ' + ${order.customer.phone}"></span>
+                        </div>
+
+                        <!-- Special instructions if any -->
+                        <div class="order-meta mt-1"
+                             th:if="${order.specialInstructions != null and !order.specialInstructions.isEmpty()}">
+                            <strong>Note:</strong>
+                            <span th:text="${order.specialInstructions}"></span>
+                        </div>
+                    </div>
+
+                    <!-- Right side: priority + tracking link -->
+                    <div class="text-end">
+                        <div class="mb-2">
+                            <span th:with="p=${order.priority.name()}"
+                                  th:class="${'badge ' + (p == 'HIGH' ? 'bg-danger' : (p == 'MEDIUM' ? 'bg-warning text-dark' : 'bg-secondary'))}"
+                                  th:text="${p}">
+                            </span>
+                        </div>
+                        <a th:href="@{/track/{id}(id=${order.id})}"
+                           class="btn btn-sm btn-outline-secondary track-link">
+                            View Order →
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div><!-- /th:each scheduledOrders -->
+
+    </div><!-- /section Today's Schedule -->
+
+</div><!-- /container -->
+
+<!-- Bootstrap JS bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
