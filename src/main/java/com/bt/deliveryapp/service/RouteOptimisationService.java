@@ -534,10 +534,147 @@ public class RouteOptimisationService {
     }
 
     // =========================================================================
-    // COMING ON DAY 4 (April 3):
+    // DAY 4 METHODS: ZONE-BASED OPTIMISATION
     //
-    // suggestBestAgent(Long orderId)  → zone-based: prefer agents in the same zone
-    //                                   as the pickup address
-    // getZoneStats()                  → admin view: how many orders per zone right now?
+    // This is the final layer of intelligence for Feature 3.
+    //
+    // Days 1-3 were "zone-blind" — we picked the first available agent regardless
+    // of where in the city they are or where the order needs to be picked up from.
+    // That works, but it's not efficient. If a NORTH zone order gets assigned to
+    // a SOUTH zone agent, that agent has to cross the entire city just to pick up
+    // the food. The customer waits longer and the agent wastes fuel.
+    //
+    // Day 4 fixes this with two methods:
+    //
+    //   suggestBestAgent(orderId)  → look at the order's pickup zone, try to find
+    //                                an available agent already in that same zone,
+    //                                fall back to any agent only if no zone match exists
+    //
+    //   getZoneStats()             → admin view: how many SCHEDULED orders are
+    //                                currently waiting in each zone? Helps the admin
+    //                                decide where to deploy agents.
+    //
+    // This is a classic software pattern called PREFERENCE WITH FALLBACK:
+    //   Try the best option first → if it's not available, use a good-enough option.
+    //   Never fail completely just because the ideal choice isn't there.
     // =========================================================================
+
+    /**
+     * Suggests the best available agent for a given order, using zone preference.
+     *
+     * The logic has two steps:
+     *
+     * STEP A — Zone match (preferred):
+     *   If the order has a pickupZone set, get all agents currently in that zone,
+     *   then find the first one who has room under the default cap of 3.
+     *   If found → return them immediately.
+     *
+     * STEP B — Any available agent (fallback):
+     *   If the order has no zone, or no zone-matched agent was available,
+     *   fall through to the normal first-fit search across all agents.
+     *   If found → return them.
+     *
+     * STEP C — Return null:
+     *   If all agents everywhere are at capacity → return null.
+     *   The caller must handle this case (no agent available right now).
+     *
+     * Why "suggest" and not "assign"?
+     * This method only RECOMMENDS an agent — it doesn't modify any database records.
+     * The actual assignment is still done by assignAgentToOrder().
+     * Keeping suggestion and assignment separate means the admin can review the
+     * suggestion before committing to it. Separating "decide" from "act" is good design.
+     *
+     * @param orderId the ID of the order that needs an agent
+     * @return the best available User (agent), or null if no one is available
+     * @throws RuntimeException if the order ID doesn't exist in the database
+     */
+    public User suggestBestAgent(Long orderId) {
+
+        // Step 1: Load the order — fail immediately if it doesn't exist
+        DeliveryRequest order = deliveryRequestRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderId));
+
+        // Step 2: Check if this order has a pickup zone set
+        String zone = order.getPickupZone();
+
+        if (zone != null && !zone.isBlank()) {
+
+            // Step 3A: Try to find an agent already in the same zone
+            // getAgentsInZone() was written on Day 1 — it queries agents by currentLocation
+            List<User> zoneAgents = getAgentsInZone(zone);
+
+            // findAgentUnderCap() was written on Day 3 — first agent under the given cap
+            // We use the default cap of 3 here (same as the rest of the system)
+            User zoneAgent = findAgentUnderCap(zoneAgents, 3);
+
+            if (zoneAgent != null) {
+                // Found a zone-matched agent with capacity — ideal result, return immediately
+                return zoneAgent;
+            }
+
+            // No zone-matched agent had room — don't give up, fall through to Step 3B
+        }
+
+        // Step 3B: Fallback — search all agents regardless of zone
+        // This runs when: (a) the order has no zone set, OR
+        //                 (b) all agents in the preferred zone are full
+        List<User> allAgents = getAllAgents();
+        return findAgentUnderCap(allAgents, 3);
+
+        // Note: findAgentUnderCap returns null if everyone is full.
+        // The caller (e.g. a controller) must check for null and handle it.
+    }
+
+    /**
+     * Returns a snapshot of how many SCHEDULED orders are waiting in each zone.
+     *
+     * The result is a Map<String, Long>:
+     *   Key   → zone name (always all five: NORTH, SOUTH, EAST, WEST, CENTRAL)
+     *   Value → number of SCHEDULED orders in that zone right now
+     *
+     * Example output:
+     *   { "NORTH"   → 4,
+     *     "SOUTH"   → 1,
+     *     "EAST"    → 7,
+     *     "WEST"    → 2,
+     *     "CENTRAL" → 0 }
+     *
+     * Why is this useful?
+     * An admin can look at this table and immediately see that EAST has 7 waiting
+     * orders but CENTRAL has 0. They can then manually move agents from CENTRAL
+     * to EAST to balance the workload before running auto-assignment.
+     *
+     * This is called operational visibility — giving decision-makers the data they
+     * need to make smart choices quickly.
+     *
+     * Why are all five zones always in the output?
+     * If we only returned zones that have orders, a zone with 0 orders would simply
+     * be missing from the map. The admin would have to guess: "Is CENTRAL missing
+     * because it has 0 orders, or because something went wrong?" Showing all five
+     * zones explicitly — even with 0 — is clearer and safer.
+     *
+     * @return Map of zone name → count of SCHEDULED orders, all five zones always present
+     */
+    public Map<String, Long> getZoneStats() {
+
+        // The five zones our city is divided into
+        // These must match the values used in User.currentLocation and DeliveryRequest.pickupZone
+        String[] zones = { "NORTH", "SOUTH", "EAST", "WEST", "CENTRAL" };
+
+        // LinkedHashMap preserves insertion order — zones will always appear in the
+        // same sequence above, not in some random order
+        Map<String, Long> stats = new LinkedHashMap<>();
+
+        for (String zone : zones) {
+            // For each zone, count how many SCHEDULED orders have that pickup zone
+            // Spring generates: SELECT COUNT(*) FROM delivery_requests
+            //                   WHERE status = 'SCHEDULED' AND pickup_zone = ?
+            long count = deliveryRequestRepository
+                    .countByStatusAndPickupZone(DeliveryStatusEnum.SCHEDULED, zone);
+
+            stats.put(zone, count);
+        }
+
+        return stats;
+    }
 }

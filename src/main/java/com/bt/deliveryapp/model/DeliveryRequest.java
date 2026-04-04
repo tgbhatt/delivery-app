@@ -81,6 +81,16 @@ public class DeliveryRequest extends BaseEntity {
 
     private LocalDateTime updatedAt;
 
+    // ---- Which delivery zone does the pickup address fall in? ----
+    // Used by Feature 3 Day 4 (zone-based optimisation) to match orders to
+    // agents who are already in the same area.
+    //
+    // Possible values: "NORTH", "SOUTH", "EAST", "WEST", "CENTRAL"
+    // Nullable — older orders placed before this field was added won't have a zone.
+    // The algorithm falls back gracefully when this is null (picks any available agent).
+    @Column(length = 20)
+    private String pickupZone;
+
     // ---- Which agent is assigned to this order? ----
     // Null when the order is first placed — Feature 3 (route optimisation) will
     // assign the nearest available agent and populate this field.
@@ -228,6 +238,14 @@ public class DeliveryRequest extends BaseEntity {
 
     public void setSpecialInstructions(String specialInstructions) {
         this.specialInstructions = specialInstructions;
+    }
+
+    public String getPickupZone() {
+        return pickupZone;
+    }
+
+    public void setPickupZone(String pickupZone) {
+        this.pickupZone = pickupZone;
     }
 
     @Override

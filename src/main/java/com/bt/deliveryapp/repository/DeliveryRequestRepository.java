@@ -76,4 +76,13 @@ public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest
     // We use this in getAgentWorkload() and getAllAgentsWorkload() to efficiently
     // check how loaded each agent is without pulling hundreds of order records into memory.
     long countByAgentAndStatus(User agent, DeliveryStatusEnum status);
+
+    // --- Added for Feature 3 Day 4: Zone-Based Optimisation ---
+    //
+    // COUNT how many orders in a given zone have a given status.
+    // Used by getZoneStats() to build a zone → order count snapshot for the admin.
+    //
+    // Spring generates:
+    // SELECT COUNT(*) FROM delivery_requests WHERE status = ? AND pickup_zone = ?
+    long countByStatusAndPickupZone(DeliveryStatusEnum status, String pickupZone);
 }
