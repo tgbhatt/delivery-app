@@ -5,101 +5,92 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 /**
- * Represents a delivery time window on a specific date.
+ * Represents a bookable time window for a scheduled delivery.
  *
- * --- What is a TimeSlot? ---
- * When a customer places a booking, they choose a preferred time window —
- * for example "March 28, between 10:00 AM and 12:00 PM". That window is a TimeSlot.
- * The system stores all available slots in this table and marks them as
- * available or booked. Feature 2 (Slot Scheduling) will read this table
- * and find the best free slot for a new delivery.
+ * --- What is this for? ---
+ * When a customer chooses "Schedule for Later", they pick from available
+ * time windows like "10am–12pm on March 30". Each of those windows is a
+ * TimeSlot row in the database.
  *
- * --- Why is this a separate class? ---
- * This is OOP design. Instead of storing "slotDate", "slotStartTime", "slotEndTime"
- * directly inside DeliveryRequest, we pull it out into its own class.
- * This means many DeliveryRequests can reference the same TimeSlot object —
- * the slot exists independently in its own table. This is NORMALISATION in databases:
- * avoid repeating the same data across multiple rows.
+ * The Admin creates these slots in advance. Feature 2's scheduling algorithm
+ * (Tanushree's) checks which slots still have capacity before assigning one.
  *
- * --- How does it connect to DeliveryRequest? ---
- * DeliveryRequest has a field "preferredTimeSlot" which is a TimeSlot object.
- * In the database, this becomes a "time_slot_id" foreign key column in delivery_requests.
+ * --- Real-world analogy ---
+ * Think of a doctor's appointment system — the doctor (admin) sets available
+ * slots, patients (customers) book into them, and once a slot is full,
+ * no more bookings are allowed.
+ *
+ * --- OOP concept: Encapsulation ---
+ * All fields are private. They can only be read/changed through the
+ * getters and setters below — this protects the data from being
+ * accidentally corrupted.
  */
 @Entity
 @Table(name = "time_slots")
-public class TimeSlot extends BaseEntity {
-    // Inherits id, getId(), setId(), and the getDisplayName() contract from BaseEntity.
+public class TimeSlot {
 
-    // ---- The date this slot is for ----
-    // e.g. 2026-03-28
+    // ---- Primary Key ----
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // ---- Which date is this slot for? ----
+    // e.g. 2026-03-30
     @Column(nullable = false)
     private LocalDate slotDate;
 
-    // ---- Start time of the delivery window ----
-    // e.g. 10:00 AM
+    // ---- Start and end time of this window ----
+    // e.g. startTime = 10:00, endTime = 12:00
     @Column(nullable = false)
     private LocalTime startTime;
 
-    // ---- End time of the delivery window ----
-    // e.g. 12:00 PM (so the window is 2 hours)
     @Column(nullable = false)
     private LocalTime endTime;
 
-    // ---- Is this slot still available? ----
-    // When a delivery is assigned to this slot, we flip this to false
-    // so no other delivery can be booked into the same window.
-    // This is the heart of Feature 2 — conflict prevention.
-    @Column(nullable = false)
-    private boolean available = true;
-
-    // ---- Label for display ----
-    // A human-readable name like "Morning (10:00 - 12:00)"
-    // Makes it easy to show nicely in HTML templates
-    @Column(length = 100)
+    // ---- Human-readable label ----
+    // e.g. "10am – 12pm" — shown on the booking form so customers understand it easily
+    @Column(length = 50)
     private String label;
 
-    // ---- How many deliveries can fit in this slot ----
-    // A slot doesn't have to be exclusive — maybe 3 agents can cover it.
-    // Default is 1, but admin can configure higher capacity.
+    // ---- Is this slot still open for new bookings? ----
+    // Set to false when bookedCount reaches capacity
     @Column(nullable = false)
-    private int capacity = 1;
+    private boolean available;
 
-    // ---- How many deliveries are currently booked into this slot ----
-    // When this equals capacity, the slot is full.
+    // ---- Max deliveries allowed in this window ----
+    // Admin decides this — e.g. capacity = 10 means max 10 orders per slot
     @Column(nullable = false)
-    private int bookedCount = 0;
+    private int capacity;
+
+    // ---- How many orders have already been booked into this slot? ----
+    // When bookedCount == capacity, available is set to false
+    @Column(nullable = false)
+    private int bookedCount;
 
     // ---- Constructors ----
     public TimeSlot() {
     }
 
-    public TimeSlot(LocalDate slotDate, LocalTime startTime, LocalTime endTime, String label, int capacity) {
+    public TimeSlot(LocalDate slotDate, LocalTime startTime, LocalTime endTime,
+                    String label, int capacity) {
         this.slotDate = slotDate;
         this.startTime = startTime;
         this.endTime = endTime;
         this.label = label;
         this.capacity = capacity;
         this.bookedCount = 0;
-        this.available = true;
-    }
-
-    // ---- Business logic method ----
-    // This is OOP: the TimeSlot object KNOWS whether it is still bookable.
-    // We keep this logic inside the class (Encapsulation) rather than checking
-    // it externally in every service that needs it.
-    public boolean isBookable() {
-        return available && bookedCount < capacity;
-    }
-
-    // ---- Called when a delivery is successfully assigned to this slot ----
-    public void incrementBookedCount() {
-        this.bookedCount++;
-        if (this.bookedCount >= this.capacity) {
-            this.available = false;  // Slot is now full — mark unavailable
-        }
+        this.available = true; // A new slot starts as available
     }
 
     // ---- Getters and Setters ----
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public LocalDate getSlotDate() {
         return slotDate;
@@ -125,20 +116,20 @@ public class TimeSlot extends BaseEntity {
         this.endTime = endTime;
     }
 
-    public boolean isAvailable() {
-        return available;
-    }
-
-    public void setAvailable(boolean available) {
-        this.available = available;
-    }
-
     public String getLabel() {
         return label;
     }
 
     public void setLabel(String label) {
         this.label = label;
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
+
+    public void setAvailable(boolean available) {
+        this.available = available;
     }
 
     public int getCapacity() {
@@ -158,14 +149,8 @@ public class TimeSlot extends BaseEntity {
     }
 
     @Override
-    public String getDisplayName() {
-        return "Slot: " + label + " on " + slotDate;
-    }
-
-    @Override
     public String toString() {
-        return "TimeSlot{id=" + getId() + ", date=" + slotDate +
-               ", " + startTime + "-" + endTime +
-               ", available=" + available + "}";
+        return "TimeSlot{id=" + id + ", date=" + slotDate + ", " + label +
+               ", booked=" + bookedCount + "/" + capacity + "}";
     }
 }

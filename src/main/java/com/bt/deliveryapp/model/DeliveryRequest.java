@@ -28,8 +28,12 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "delivery_requests")
-public class DeliveryRequest extends BaseEntity {
-    // Inherits id, getId(), setId(), and the getDisplayName() contract from BaseEntity.
+public class DeliveryRequest {
+
+    // ---- Primary Key ----
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     // ---- Who placed this order? ----
     // Links to the users table via a foreign key column "customer_id"
@@ -61,7 +65,7 @@ public class DeliveryRequest extends BaseEntity {
     // true  = Order Now  → skip slot scheduling, go straight into the queue
     // false = Schedule for Later → run through the slot scheduling algorithm
     @Column(nullable = false)
-    private boolean immediate;
+    private boolean isImmediate;
 
     // ---- Which time slot was assigned? ----
     // Only relevant when isImmediate = false (scheduled orders)
@@ -69,6 +73,12 @@ public class DeliveryRequest extends BaseEntity {
     @ManyToOne
     @JoinColumn(name = "time_slot_id")
     private TimeSlot timeSlot;
+
+    // ---- Which agent is handling this order? ----
+    // Null until an agent is assigned (Feature 3)
+    @ManyToOne
+    @JoinColumn(name = "agent_id")
+    private Agent agent;
 
     // ---- Current status of this order ----
     @Enumerated(EnumType.STRING)
@@ -80,24 +90,6 @@ public class DeliveryRequest extends BaseEntity {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
-
-    // ---- Which delivery zone does the pickup address fall in? ----
-    // Used by Feature 3 Day 4 (zone-based optimisation) to match orders to
-    // agents who are already in the same area.
-    //
-    // Possible values: "NORTH", "SOUTH", "EAST", "WEST", "CENTRAL"
-    // Nullable — older orders placed before this field was added won't have a zone.
-    // The algorithm falls back gracefully when this is null (picks any available agent).
-    @Column(length = 20)
-    private String pickupZone;
-
-    // ---- Which agent is assigned to this order? ----
-    // Null when the order is first placed — Feature 3 (route optimisation) will
-    // assign the nearest available agent and populate this field.
-    // nullable = true because no agent is assigned at booking time.
-    @ManyToOne
-    @JoinColumn(name = "agent_id")
-    private User agent;
 
     // ---- Any special delivery instructions? ----
     // e.g. "Leave at door", "Call on arrival", "No contactless"
@@ -117,7 +109,7 @@ public class DeliveryRequest extends BaseEntity {
         this.orderDescription = orderDescription;
         this.priority = priority;
         this.specialInstructions = specialInstructions;
-        this.immediate = true;                // Order Now path
+        this.isImmediate = true;              // Order Now path
         this.status = DeliveryStatusEnum.PLACED;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -135,7 +127,7 @@ public class DeliveryRequest extends BaseEntity {
         this.priority = priority;
         this.specialInstructions = specialInstructions;
         this.timeSlot = timeSlot;
-        this.immediate = false;               // Schedule for Later path
+        this.isImmediate = false;             // Schedule for Later path
         this.status = DeliveryStatusEnum.PLACED;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -143,20 +135,20 @@ public class DeliveryRequest extends BaseEntity {
 
     // ---- Getters and Setters ----
 
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public User getCustomer() {
         return customer;
     }
 
     public void setCustomer(User customer) {
         this.customer = customer;
-    }
-
-    public User getAgent() {
-        return agent;
-    }
-
-    public void setAgent(User agent) {
-        this.agent = agent;
     }
 
     public String getRestaurantAddress() {
@@ -192,11 +184,11 @@ public class DeliveryRequest extends BaseEntity {
     }
 
     public boolean isImmediate() {
-        return immediate;
+        return isImmediate;
     }
 
     public void setImmediate(boolean immediate) {
-        this.immediate = immediate;
+        isImmediate = immediate;
     }
 
     public TimeSlot getTimeSlot() {
@@ -205,6 +197,14 @@ public class DeliveryRequest extends BaseEntity {
 
     public void setTimeSlot(TimeSlot timeSlot) {
         this.timeSlot = timeSlot;
+    }
+
+    public Agent getAgent() {
+        return agent;
+    }
+
+    public void setAgent(Agent agent) {
+        this.agent = agent;
     }
 
     public DeliveryStatusEnum getStatus() {
@@ -240,25 +240,12 @@ public class DeliveryRequest extends BaseEntity {
         this.specialInstructions = specialInstructions;
     }
 
-    public String getPickupZone() {
-        return pickupZone;
-    }
-
-    public void setPickupZone(String pickupZone) {
-        this.pickupZone = pickupZone;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return "Order #" + getId() + ": " + restaurantAddress + " → " + customerAddress;
-    }
-
     @Override
     public String toString() {
-        return "DeliveryRequest{id=" + getId() +
+        return "DeliveryRequest{id=" + id +
                ", from='" + restaurantAddress +
                "', to='" + customerAddress +
-               "', immediate=" + immediate +
+               "', immediate=" + isImmediate +
                ", priority=" + priority +
                ", status=" + status + "}";
     }
