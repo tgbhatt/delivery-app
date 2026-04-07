@@ -32,4 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### Sensitive config — never commit DB credentials ###
 src/main/resources/application.properties
+
+### Mac system files — never commit these ###
+.DS_Store
+**/.DS_Store
