@@ -1,7 +1,7 @@
 package com.bt.deliveryapp.repository;
 
 import com.bt.deliveryapp.enums.DeliveryStatusEnum;
-import com.bt.deliveryapp.model.Agent;
+import com.bt.deliveryapp.enums.Priority;
 import com.bt.deliveryapp.model.DeliveryRequest;
 import com.bt.deliveryapp.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,57 +10,57 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * Repository for DeliveryRequest — handles all database reads and writes for orders.
+ * The repository for the DeliveryRequest table in MySQL.
  *
- * --- What is a Repository? ---
- * A repository is the layer between your Java code and the database.
- * Instead of writing raw SQL like "SELECT * FROM delivery_requests WHERE status = 'PLACED'",
- * you just write a method name in a specific format and Spring auto-generates the SQL for you.
+ * --- What queries do we need? ---
+ * Think about what the app needs to look up:
+ * 1. A customer opens "My Bookings" → we need all requests made by THAT customer
+ * 2. Admin opens the dashboard → we need all requests with status PENDING or ASSIGNED
+ * 3. Feature 2 (slot scheduling) → we need all requests with a certain status or priority
  *
- * --- How does it work? ---
- * By extending JpaRepository<DeliveryRequest, Long>, we get basic operations for free:
- *   save(request)        → INSERT or UPDATE row in delivery_requests table
- *   findById(id)         → SELECT * FROM delivery_requests WHERE id = ?
- *   findAll()            → SELECT * FROM delivery_requests
- *   delete(request)      → DELETE FROM delivery_requests WHERE id = ?
+ * Each of these becomes one method below. Spring generates the SQL automatically
+ * just from the method name.
  *
- * The custom methods below follow Spring's naming convention:
- *   findBy[FieldName]    → Spring generates the WHERE clause automatically
+ * --- Method naming rules ---
+ * findBy + FieldName         → WHERE field = ?
+ * findBy + Field1 + And + Field2 → WHERE field1 = ? AND field2 = ?
+ * findBy + Field + OrderBy + OtherField + Desc → ORDER BY
  *
- * --- OOP concept ---
- * This is the REPOSITORY pattern — a classic design pattern that separates
- * data access logic from business logic. TrackingService uses this repository
- * but never writes a single line of SQL — clean separation of concerns.
+ * So "findByCustomerAndStatus" becomes:
+ * SELECT * FROM delivery_requests WHERE customer_id = ? AND status = ?
  */
 @Repository
 public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest, Long> {
 
-    // Get all orders placed by a specific customer
-    // SQL generated: SELECT * FROM delivery_requests WHERE customer_id = ?
-    List<DeliveryRequest> findByCustomer(User customer);
+    // All bookings made by a specific customer (for "My Bookings" page)
+    // Results sorted newest first (most recent booking at the top)
+    List<DeliveryRequest> findByCustomerOrderByCreatedAtDesc(User customer);
 
-    // Get all orders currently at a specific status (e.g. all PLACED orders)
-    // SQL generated: SELECT * FROM delivery_requests WHERE status = ?
+    // All deliveries with a given status (e.g. all PLACED requests awaiting scheduling)
+    // Used by Feature 2 and Feature 3
     List<DeliveryRequest> findByStatus(DeliveryStatusEnum status);
 
-    // Get all orders for a customer that are at a specific status
-    // e.g. "show me all PLACED orders for this customer"
+    // All deliveries for a customer with a specific status
+    // e.g. "show me all my DELIVERED orders"
     List<DeliveryRequest> findByCustomerAndStatus(User customer, DeliveryStatusEnum status);
 
-    // Get all orders assigned to a specific agent
-    // Used by the agent dashboard (Feature 5) to show their deliveries
-    List<DeliveryRequest> findByAgent(Agent agent);
+    // All requests with a given priority (e.g. to process URGENT ones first)
+    List<DeliveryRequest> findByPriority(Priority priority);
 
-    // Get all immediate orders (Order Now) at a given status
-    // Used by admin dashboard to show the live feed
-    List<DeliveryRequest> findByIsImmediateAndStatus(boolean isImmediate, DeliveryStatusEnum status);
+    // All requests that have NOT yet been scheduled (still sitting as PLACED)
+    // Feature 2 uses this to find deliveries that still need a slot assigned
+    List<DeliveryRequest> findByStatusOrderByPriorityDesc(DeliveryStatusEnum status);
 
-    // Get all orders for a specific agent at a given status
-    // e.g. all OUT_FOR_DELIVERY orders for agent X
-    List<DeliveryRequest> findByAgentAndStatus(Agent agent, DeliveryStatusEnum status);
+    // Count how many active deliveries a customer currently has
+    // "active" means anything that isn't DELIVERED or FAILED
+    long countByCustomerAndStatusNot(User customer, DeliveryStatusEnum status);
 
-    // Get all orders of a given type — immediate (Order Now) or scheduled
-    // Used by the admin dashboard to populate the two side-by-side panels
-    // SQL generated: SELECT * FROM delivery_requests WHERE is_immediate = ?
-    List<DeliveryRequest> findByIsImmediate(boolean isImmediate);
+    // All orders assigned to a specific agent, newest first
+    // Used by DeliveryAgentService to show an agent their workload
+    // Spring generates: SELECT * FROM delivery_requests WHERE agent_id = ? ORDER BY created_at DESC
+    List<DeliveryRequest> findByAgentOrderByCreatedAtDesc(User agent);
+
+    // All orders for a specific agent with a specific status
+    // e.g. findByAgentAndStatus(agent, DELIVERED) → agent's completed delivery history
+    List<DeliveryRequest> findByAgentAndStatus(User agent, DeliveryStatusEnum status);
 }
