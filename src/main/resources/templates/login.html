@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head(title='Sign In')}">
+</head>
+<body style="margin:0; padding:0;">
+
+<div class="diq-auth-layout">
+
+  <!-- ── Left: Brand Panel ───────────────────────────────── -->
+  <div class="diq-auth-brand">
+    <div class="brand-logo">
+      <div class="logo-box"><i class="bi bi-truck"></i></div>
+      <span>DeliverIQ</span>
+    </div>
+
+    <h1 class="brand-headline">Delivery,<br/>reimagined.</h1>
+    <p class="brand-tagline">
+      Schedule, track, and optimise every last-mile delivery —
+      all from one intelligent platform.
+    </p>
+
+    <div class="brand-features">
+      <div class="brand-feature">
+        <div class="feature-check"><i class="bi bi-check"></i></div>
+        Real-time live tracking
+      </div>
+      <div class="brand-feature">
+        <div class="feature-check"><i class="bi bi-check"></i></div>
+        Smart slot scheduling
+      </div>
+      <div class="brand-feature">
+        <div class="feature-check"><i class="bi bi-check"></i></div>
+        Optimised delivery routes
+      </div>
+      <div class="brand-feature">
+        <div class="feature-check"><i class="bi bi-check"></i></div>
+        Role-based dashboards
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right: Form Panel ──────────────────────────────── -->
+  <div class="diq-auth-form-side">
+    <div class="diq-auth-form-inner">
+
+      <!-- Logo (mobile only) -->
+      <div class="d-flex align-items-center gap-2 mb-4 d-md-none">
+        <div style="width:32px;height:32px;background:linear-gradient(135deg,#1E3A5F,#2563EB);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:1rem;">
+          <i class="bi bi-truck"></i>
+        </div>
+        <span style="font-size:1.125rem;font-weight:700;color:#1E3A5F;letter-spacing:-0.02em;">DeliverIQ</span>
+      </div>
+
+      <p class="form-title">Welcome back</p>
+      <p class="form-subtitle">Sign in to your account to continue</p>
+
+      <!-- Flash error -->
+      <div th:if="${errorMessage}" class="diq-alert diq-alert-error mb-4" data-auto-dismiss="6000">
+        <i class="bi bi-x-circle-fill alert-icon"></i>
+        <span th:text="${errorMessage}">Invalid credentials</span>
+        <button class="alert-close" type="button"><i class="bi bi-x"></i></button>
+      </div>
+
+      <!-- Login form -->
+      <form th:action="@{/login}" method="post" class="gap-stack-md" style="display:flex;flex-direction:column;gap:1.125rem;">
+
+        <!-- Email -->
+        <div class="diq-form-group">
+          <label for="email" class="diq-label">Email address</label>
+          <div class="diq-input-wrap">
+            <i class="bi bi-envelope input-icon"></i>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              class="diq-input"
+              placeholder="you@example.com"
+              autocomplete="email"
+              required />
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div class="diq-form-group">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <label for="password" class="diq-label">Password</label>
+          </div>
+          <div class="diq-input-wrap">
+            <i class="bi bi-lock input-icon"></i>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              class="diq-input has-action"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              required />
+            <button type="button" class="input-action" onclick="togglePassword(this)" aria-label="Toggle password visibility">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" class="diq-btn diq-btn-primary diq-btn-lg diq-btn-full" style="margin-top:0.5rem;">
+          <i class="bi bi-arrow-right-circle"></i>
+          Sign in
+        </button>
+
+      </form>
+
+      <!-- Register link -->
+      <p style="margin-top:1.75rem;text-align:center;font-size:0.9rem;color:#6E6E73;">
+        New to DeliverIQ?
+        <a th:href="@{/register}"
+           style="color:#2563EB;font-weight:600;text-decoration:none;">
+          Create an account
+        </a>
+      </p>
+
+    </div>
+  </div>
+
+</div>
+
+<div th:replace="~{fragments/layout :: scripts}"></div>
+</body>
+</html>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head(title='Book a Delivery')}">
+</head>
+<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="diq-container-sm">
+
+  <!-- Flash messages -->
+  <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
+
+  <!-- ── Page Header ──────────────────────────────────────── -->
+  <div class="diq-page-header">
+    <p class="diq-label" style="margin-bottom:0.25rem;">
+      <a th:href="@{/customer/orders}"
+         style="color:#6E6E73;text-decoration:none;display:flex;align-items:center;gap:0.3rem;display:inline-flex;">
+        <i class="bi bi-arrow-left"></i> My Orders
+      </a>
+    </p>
+    <h1 style="font-size:1.625rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:0.25rem;">Book a Delivery</h1>
+    <p style="font-size:0.9rem;color:#6E6E73;margin:0;">Follow the steps to schedule your delivery.</p>
+  </div>
+
+  <!-- ── Wizard Card ─────────────────────────────────────── -->
+  <div id="bookingWizard" class="diq-card" style="border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,.09);">
+    <div class="diq-card-body" style="padding:2rem 2.5rem;">
+
+      <!-- Stepper -->
+      <div id="diqStepper" class="diq-stepper">
+        <div class="diq-stepper-track">
+          <div class="diq-stepper-progress" id="stepperProgress"></div>
+        </div>
+        <div class="diq-step">
+          <div class="step-circle">1</div>
+          <span class="step-label">Addresses</span>
+        </div>
+        <div class="diq-step">
+          <div class="step-circle">2</div>
+          <span class="step-label">Package</span>
+        </div>
+        <div class="diq-step">
+          <div class="step-circle">3</div>
+          <span class="step-label">Delivery Type</span>
+        </div>
+        <div class="diq-step">
+          <div class="step-circle">4</div>
+          <span class="step-label">Review</span>
+        </div>
+      </div>
+
+      <!-- Master form wraps all steps -->
+      <form id="bookingForm" th:action="@{/customer/book}" method="post">
+
+        <!-- ── Step 1: Addresses ─────────────────────────── -->
+        <div class="diq-step-panel" id="panel-1">
+          <h3 style="font-size:1.125rem;font-weight:700;letter-spacing:-0.01em;margin-bottom:0.375rem;">
+            <i class="bi bi-geo-alt me-2" style="color:#2563EB;"></i>Addresses
+          </h3>
+          <p style="font-size:0.875rem;color:#6E6E73;margin-bottom:1.5rem;">Where should we pick up, and where does it go?</p>
+
+          <div style="display:flex;flex-direction:column;gap:1.125rem;">
+
+            <div class="diq-form-group">
+              <label for="pickupAddress" class="diq-label">Pickup address <span class="required">*</span></label>
+              <div class="diq-input-wrap">
+                <i class="bi bi-geo-alt input-icon" style="color:#2563EB;"></i>
+                <input id="pickupAddress" name="pickupAddress" type="text"
+                       class="diq-input"
+                       placeholder="e.g. 12 Baker Street, Mumbai"
+                       required />
+              </div>
+            </div>
+
+            <div class="diq-form-group">
+              <label for="deliveryAddress" class="diq-label">Delivery address <span class="required">*</span></label>
+              <div class="diq-input-wrap">
+                <i class="bi bi-geo-alt-fill input-icon" style="color:#16A34A;"></i>
+                <input id="deliveryAddress" name="deliveryAddress" type="text"
+                       class="diq-input"
+                       placeholder="e.g. 47 Marine Drive, Mumbai"
+                       required />
+              </div>
+            </div>
+
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-top:1.75rem;">
+            <button type="button" class="diq-btn diq-btn-primary"
+                    onclick="diqStepNextValidate(['pickupAddress','deliveryAddress'])">
+              Next <i class="bi bi-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Step 2: Package Details ───────────────────── -->
+        <div class="diq-step-panel" id="panel-2">
+          <h3 style="font-size:1.125rem;font-weight:700;letter-spacing:-0.01em;margin-bottom:0.375rem;">
+            <i class="bi bi-box-seam me-2" style="color:#2563EB;"></i>Package Details
+          </h3>
+          <p style="font-size:0.875rem;color:#6E6E73;margin-bottom:1.5rem;">Tell us what we're delivering.</p>
+
+          <div style="display:flex;flex-direction:column;gap:1.125rem;">
+
+            <div class="diq-form-group">
+              <label for="packageDescription" class="diq-label">Package description <span class="required">*</span></label>
+              <div class="diq-input-wrap">
+                <i class="bi bi-card-text input-icon"></i>
+                <input id="packageDescription" name="packageDescription" type="text"
+                       class="diq-input"
+                       placeholder="e.g. Electronics, documents, groceries…"
+                       required />
+              </div>
+            </div>
+
+            <div class="diq-form-group">
+              <label for="priority" class="diq-label">Priority <span class="required">*</span></label>
+              <select id="priority" name="priority" class="diq-select" required>
+                <option value="">Select priority…</option>
+                <option value="HIGH">🔴 High</option>
+                <option value="MEDIUM">🟡 Medium</option>
+                <option value="LOW">⚪ Low</option>
+              </select>
+            </div>
+
+            <div class="diq-form-group">
+              <label for="specialInstructions" class="diq-label">
+                Special instructions
+                <span style="font-size:0.75rem;font-weight:400;color:#6E6E73;margin-left:4px;">(optional)</span>
+              </label>
+              <textarea id="specialInstructions" name="specialInstructions"
+                        class="diq-input diq-textarea"
+                        rows="3"
+                        placeholder="Fragile, leave at door, ring bell…"></textarea>
+            </div>
+
+          </div>
+
+          <div style="display:flex;justify-content:space-between;margin-top:1.75rem;">
+            <button type="button" class="diq-btn diq-btn-secondary" onclick="diqStepPrev()">
+              <i class="bi bi-arrow-left"></i> Back
+            </button>
+            <button type="button" class="diq-btn diq-btn-primary"
+                    onclick="diqStepNextValidate(['packageDescription','priority'])">
+              Next <i class="bi bi-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Step 3: Delivery Type ─────────────────────── -->
+        <div class="diq-step-panel" id="panel-3">
+          <h3 style="font-size:1.125rem;font-weight:700;letter-spacing:-0.01em;margin-bottom:0.375rem;">
+            <i class="bi bi-clock me-2" style="color:#2563EB;"></i>Delivery Type
+          </h3>
+          <p style="font-size:0.875rem;color:#6E6E73;margin-bottom:1.5rem;">When would you like this delivered?</p>
+
+          <!-- Type selector cards -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem;">
+
+            <label for="typeImmediate"
+                   style="cursor:pointer;border:2px solid #E5E5EA;border-radius:14px;padding:1.25rem;text-align:center;transition:all 0.2s;"
+                   class="type-option" id="label-immediate">
+              <input type="radio" id="typeImmediate" name="isImmediate" value="true"
+                     style="display:none;" onchange="handleTypeChange(this)" />
+              <div style="font-size:1.75rem;margin-bottom:0.5rem;">⚡</div>
+              <div style="font-size:0.9375rem;font-weight:700;color:#1D1D1F;margin-bottom:0.25rem;">Immediate</div>
+              <div style="font-size:0.8rem;color:#6E6E73;">Pick up and deliver as soon as possible</div>
+            </label>
+
+            <label for="typeScheduled"
+                   style="cursor:pointer;border:2px solid #E5E5EA;border-radius:14px;padding:1.25rem;text-align:center;transition:all 0.2s;"
+                   class="type-option" id="label-scheduled">
+              <input type="radio" id="typeScheduled" name="isImmediate" value="false"
+                     style="display:none;" onchange="handleTypeChange(this)" />
+              <div style="font-size:1.75rem;margin-bottom:0.5rem;">📅</div>
+              <div style="font-size:0.9375rem;font-weight:700;color:#1D1D1F;margin-bottom:0.25rem;">Scheduled</div>
+              <div style="font-size:0.8rem;color:#6E6E73;">Choose a convenient time slot</div>
+            </label>
+
+          </div>
+
+          <!-- Slot picker (only shown for Scheduled) -->
+          <div id="slotPicker" style="display:none;animation:panelIn 200ms ease forwards;">
+            <div class="diq-form-group">
+              <label for="timeSlotId" class="diq-label">Choose a time slot <span class="required">*</span></label>
+              <select id="timeSlotId" name="timeSlotId" class="diq-select">
+                <option value="">Select an available slot…</option>
+                <option th:each="slot : ${availableSlots}"
+                        th:value="${slot.id}"
+                        th:text="${#temporals.format(slot.date,'EEE dd MMM')} + ' · ' + ${slot.startTime} + ' – ' + ${slot.endTime}">
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;margin-top:1.75rem;">
+            <button type="button" class="diq-btn diq-btn-secondary" onclick="diqStepPrev()">
+              <i class="bi bi-arrow-left"></i> Back
+            </button>
+            <button type="button" class="diq-btn diq-btn-primary" onclick="validateTypeStep()">
+              Next <i class="bi bi-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Step 4: Review & Confirm ──────────────────── -->
+        <div class="diq-step-panel" id="panel-4">
+          <h3 style="font-size:1.125rem;font-weight:700;letter-spacing:-0.01em;margin-bottom:0.375rem;">
+            <i class="bi bi-check-circle me-2" style="color:#16A34A;"></i>Review &amp; Confirm
+          </h3>
+          <p style="font-size:0.875rem;color:#6E6E73;margin-bottom:1.5rem;">Double-check your booking details before confirming.</p>
+
+          <!-- Summary card -->
+          <div style="background:#F5F5F7;border-radius:14px;padding:1.25rem;display:flex;flex-direction:column;gap:0.875rem;margin-bottom:1.5rem;">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+              <div>
+                <p class="diq-label" style="margin-bottom:0.2rem;">Pickup</p>
+                <p id="review-pickup" style="font-size:0.875rem;color:#1D1D1F;margin:0;">—</p>
+              </div>
+              <div>
+                <p class="diq-label" style="margin-bottom:0.2rem;">Delivery</p>
+                <p id="review-delivery" style="font-size:0.875rem;color:#1D1D1F;margin:0;">—</p>
+              </div>
+              <div>
+                <p class="diq-label" style="margin-bottom:0.2rem;">Package</p>
+                <p id="review-package" style="font-size:0.875rem;color:#1D1D1F;margin:0;">—</p>
+              </div>
+              <div>
+                <p class="diq-label" style="margin-bottom:0.2rem;">Priority</p>
+                <p id="review-priority" style="font-size:0.875rem;color:#1D1D1F;margin:0;">—</p>
+              </div>
+              <div>
+                <p class="diq-label" style="margin-bottom:0.2rem;">Type</p>
+                <p id="review-type" style="font-size:0.875rem;color:#1D1D1F;margin:0;">—</p>
+              </div>
+              <div id="review-slot-wrap">
+                <p class="diq-label" style="margin-bottom:0.2rem;">Slot</p>
+                <p id="review-slot" style="font-size:0.875rem;color:#1D1D1F;margin:0;">—</p>
+              </div>
+            </div>
+
+            <div id="review-instructions-wrap" style="display:none;">
+              <p class="diq-label" style="margin-bottom:0.2rem;">Instructions</p>
+              <p id="review-instructions" style="font-size:0.875rem;color:#6E6E73;margin:0;font-style:italic;"></p>
+            </div>
+
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+            <button type="button" class="diq-btn diq-btn-secondary" onclick="diqStepPrev()">
+              <i class="bi bi-arrow-left"></i> Back
+            </button>
+            <button type="submit" class="diq-btn diq-btn-success diq-btn-lg">
+              <i class="bi bi-check-circle"></i>
+              Confirm Booking
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<!-- Inline script for type toggle + review population -->
+<script>
+  function handleTypeChange(radio) {
+    const isImmediate = radio.value === 'true';
+    const slotPicker  = document.getElementById('slotPicker');
+    const labelImm    = document.getElementById('label-immediate');
+    const labelSched  = document.getElementById('label-scheduled');
+
+    slotPicker.style.display = isImmediate ? 'none' : 'block';
+
+    [labelImm, labelSched].forEach(function(l) {
+      l.style.border       = '2px solid #E5E5EA';
+      l.style.background   = 'white';
+    });
+
+    const activeLabel = isImmediate ? labelImm : labelSched;
+    activeLabel.style.border     = '2px solid #2563EB';
+    activeLabel.style.background = '#EFF6FF';
+  }
+
+  function validateTypeStep() {
+    const radios  = document.querySelectorAll('[name="isImmediate"]');
+    const checked = Array.from(radios).find(r => r.checked);
+    if (!checked) {
+      alert('Please select a delivery type.');
+      return;
+    }
+    if (checked.value === 'false') {
+      const slot = document.getElementById('timeSlotId');
+      if (!slot || !slot.value) {
+        slot.classList.add('is-invalid');
+        slot.focus();
+        return;
+      }
+    }
+    populateReview();
+    diqStepNext();
+  }
+
+  function populateReview() {
+    function val(id) {
+      const el = document.getElementById(id);
+      return el ? el.value : '';
+    }
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text || '—';
+    }
+
+    setText('review-pickup',   val('pickupAddress'));
+    setText('review-delivery', val('deliveryAddress'));
+    setText('review-package',  val('packageDescription'));
+    setText('review-priority', val('priority'));
+
+    const radios  = document.querySelectorAll('[name="isImmediate"]');
+    const checked = Array.from(radios).find(r => r.checked);
+    const isImm   = checked && checked.value === 'true';
+    setText('review-type', isImm ? '⚡ Immediate' : '📅 Scheduled');
+
+    const slotWrap = document.getElementById('review-slot-wrap');
+    const slotEl   = document.getElementById('timeSlotId');
+    if (isImm) {
+      if (slotWrap) slotWrap.style.display = 'none';
+    } else {
+      if (slotWrap) slotWrap.style.display = 'block';
+      if (slotEl && slotEl.selectedIndex > 0) {
+        setText('review-slot', slotEl.options[slotEl.selectedIndex].text);
+      }
+    }
+
+    const instrEl   = document.getElementById('specialInstructions');
+    const instrWrap = document.getElementById('review-instructions-wrap');
+    const instrText = instrEl ? instrEl.value.trim() : '';
+    if (instrText && instrWrap) {
+      instrWrap.style.display = 'block';
+      setText('review-instructions', instrText);
+    } else if (instrWrap) {
+      instrWrap.style.display = 'none';
+    }
+  }
+</script>
+
+<div th:replace="~{fragments/layout :: scripts}"></div>
+</body>
+</html>

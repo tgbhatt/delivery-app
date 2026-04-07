@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head(title='Track Delivery')}">
+</head>
+<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="diq-container-sm" style="margin-top:0.5rem;">
+
+  <!-- Flash messages -->
+  <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
+
+  <!-- ── Page Header ──────────────────────────────────────── -->
+  <div class="diq-page-header" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+      <div>
+        <p class="diq-label" style="margin-bottom:0.25rem;">
+          <a th:href="${isAgent} ? '/agent/dashboard' : '/customer/orders'"
+             style="color:#6E6E73;text-decoration:none;display:flex;align-items:center;gap:0.3rem;">
+            <i class="bi bi-arrow-left"></i> Back
+          </a>
+        </p>
+        <h1 style="font-size:1.5rem;font-weight:700;letter-spacing:-0.02em;margin:0;">
+          Order
+          <span style="font-family:'SF Mono','Fira Code',monospace;color:#2563EB;font-size:1.375rem;"
+                th:text="'#' + ${order.id}">
+            #ID
+          </span>
+        </h1>
+      </div>
+
+      <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+        <span class="diq-badge"
+              th:classappend="'diq-badge-' + ${order.currentStatus.name()}"
+              th:text="${order.currentStatus.name().replace('_',' ')}">
+          STATUS
+        </span>
+        <span th:if="${order.isImmediate}" class="diq-badge diq-badge-immediate">
+          <i class="bi bi-lightning-charge-fill"></i> Immediate
+        </span>
+        <span th:unless="${order.isImmediate}" class="diq-badge diq-badge-scheduled">
+          <i class="bi bi-calendar-check"></i> Scheduled
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main grid ─────────────────────────────────────────── -->
+  <div class="row g-4">
+
+    <!-- LEFT: Order Details + Agent Actions ─────────────── -->
+    <div class="col-12 col-md-6">
+
+      <!-- Details card -->
+      <div class="diq-card" style="height:fit-content;">
+        <div class="diq-card-header">
+          <span style="font-size:0.9rem;font-weight:600;color:#1D1D1F;">
+            <i class="bi bi-box-seam me-2" style="color:#2563EB;"></i>Order Details
+          </span>
+        </div>
+        <div class="diq-card-body">
+
+          <!-- Route -->
+          <div style="margin-bottom:1.25rem;">
+            <p class="diq-label" style="margin-bottom:0.625rem;">Route</p>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+              <div style="display:flex;align-items:flex-start;gap:0.625rem;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#2563EB;margin-top:5px;flex-shrink:0;"></div>
+                <div>
+                  <p style="font-size:0.75rem;font-weight:600;color:#6E6E73;margin-bottom:0.1rem;">PICKUP</p>
+                  <p style="font-size:0.875rem;color:#1D1D1F;margin:0;" th:text="${order.pickupAddress}">Pickup address</p>
+                </div>
+              </div>
+              <div style="width:1px;height:14px;background:#E5E5EA;margin-left:3.5px;"></div>
+              <div style="display:flex;align-items:flex-start;gap:0.625rem;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#16A34A;margin-top:5px;flex-shrink:0;"></div>
+                <div>
+                  <p style="font-size:0.75rem;font-weight:600;color:#6E6E73;margin-bottom:0.1rem;">DELIVERY</p>
+                  <p style="font-size:0.875rem;color:#1D1D1F;margin:0;" th:text="${order.deliveryAddress}">Delivery address</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #E5E5EA;margin:1rem 0;" />
+
+          <!-- Meta grid -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
+            <div>
+              <p class="diq-label" style="margin-bottom:0.25rem;">Package</p>
+              <p style="font-size:0.875rem;color:#1D1D1F;margin:0;" th:text="${order.packageDescription}">Description</p>
+            </div>
+
+            <div>
+              <p class="diq-label" style="margin-bottom:0.25rem;">Priority</p>
+              <span class="diq-badge"
+                    th:classappend="'diq-badge-priority-' + ${order.priority.name()}"
+                    th:text="${order.priority.name()}">PRIORITY</span>
+            </div>
+
+            <div th:if="${order.timeSlot != null}">
+              <p class="diq-label" style="margin-bottom:0.25rem;">Time Slot</p>
+              <p style="font-size:0.875rem;color:#1D1D1F;margin:0;">
+                <span th:text="${#temporals.format(order.timeSlot.date,'dd MMM yyyy')}">Date</span><br/>
+                <span style="color:#6E6E73;font-size:0.8125rem;"
+                      th:text="${order.timeSlot.startTime} + ' – ' + ${order.timeSlot.endTime}">Time</span>
+              </p>
+            </div>
+
+            <div th:if="${order.agent != null}">
+              <p class="diq-label" style="margin-bottom:0.25rem;">Agent</p>
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#1E3A5F,#2563EB);color:white;font-size:0.625rem;font-weight:700;display:flex;align-items:center;justify-content:center;"
+                     th:text="${#strings.toUpperCase(#strings.substring(order.agent.user.name,0,1))}">A</div>
+                <span style="font-size:0.875rem;color:#1D1D1F;" th:text="${order.agent.user.name}">Agent</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Special instructions -->
+          <div th:if="${order.specialInstructions != null and !#strings.isEmpty(order.specialInstructions)}"
+               style="margin-top:1rem;padding:0.75rem;background:#F5F5F7;border-radius:8px;border-left:3px solid #2563EB;">
+            <p class="diq-label" style="margin-bottom:0.25rem;">Special Instructions</p>
+            <p style="font-size:0.875rem;color:#1D1D1F;margin:0;" th:text="${order.specialInstructions}">Instructions</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Agent action panel -->
+      <div th:if="${isAgent and validNextStatuses != null and !validNextStatuses.isEmpty()}"
+           class="diq-card" style="margin-top:1rem;">
+        <div class="diq-card-header">
+          <span style="font-size:0.9rem;font-weight:600;color:#1D1D1F;">
+            <i class="bi bi-arrow-right-circle me-2" style="color:#2563EB;"></i>Update Status
+          </span>
+        </div>
+        <div class="diq-card-body" style="display:flex;flex-direction:column;gap:1rem;">
+          <p style="font-size:0.8rem;color:#6E6E73;margin:0;">Select the next status and add a note:</p>
+
+          <div th:each="nextStatus : ${validNextStatuses}">
+            <form th:action="@{'/track/' + ${order.id} + '/update'}" method="post"
+                  style="background:#F5F5F7;border-radius:12px;padding:1rem;border:1px solid #E5E5EA;">
+              <input type="hidden" name="newStatus" th:value="${nextStatus.name()}" />
+
+              <div class="diq-form-group" style="margin-bottom:0.625rem;">
+                <label class="diq-label"
+                       th:text="${nextStatus.name().replace('_',' ')}
+                                + (${nextStatus.name() == 'FAILED' or nextStatus.name() == 'RESCHEDULED'} ? ' — Note required' : ' — Note (optional)')">
+                </label>
+                <textarea class="diq-input diq-textarea"
+                          name="note"
+                          rows="2"
+                          placeholder="Add a note…"
+                          th:required="${nextStatus.name() == 'FAILED' or nextStatus.name() == 'RESCHEDULED'}">
+                </textarea>
+              </div>
+
+              <button type="submit"
+                      class="diq-btn diq-btn-full diq-btn-sm"
+                      th:classappend="${nextStatus.name() == 'DELIVERED'      ? 'diq-btn-success' :
+                                       nextStatus.name() == 'FAILED'          ? 'diq-btn-danger'  :
+                                       nextStatus.name() == 'RESCHEDULED'     ? 'diq-btn-warning'  :
+                                       'diq-btn-primary'}">
+                <i class="bi"
+                   th:classappend="${nextStatus.name() == 'DELIVERED'      ? 'bi-check-circle'        :
+                                    nextStatus.name() == 'FAILED'          ? 'bi-x-circle'             :
+                                    nextStatus.name() == 'OUT_FOR_DELIVERY'? 'bi-truck'                :
+                                    'bi-arrow-right'}"></i>
+                <span th:text="'Mark as ' + ${nextStatus.name().replace('_',' ')}">Update</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal state -->
+      <div th:if="${isAgent and (validNextStatuses == null or validNextStatuses.isEmpty())}"
+           class="diq-card" style="margin-top:1rem;">
+        <div class="diq-card-body" style="text-align:center;padding:2rem 1.5rem;">
+          <div style="font-size:2.5rem;margin-bottom:0.75rem;opacity:0.8;">
+            <span th:if="${order.currentStatus.name() == 'DELIVERED'}">✅</span>
+            <span th:if="${order.currentStatus.name() == 'FAILED'}">❌</span>
+            <span th:unless="${order.currentStatus.name() == 'DELIVERED' or order.currentStatus.name() == 'FAILED'}">🔄</span>
+          </div>
+          <p style="font-size:0.9375rem;font-weight:700;color:#1D1D1F;margin-bottom:0.25rem;">Order complete</p>
+          <p style="font-size:0.875rem;color:#6E6E73;margin:0;">No further updates available.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Tracking Timeline ────────────────────────── -->
+    <div class="col-12 col-md-6">
+      <div class="diq-card">
+        <div class="diq-card-header">
+          <span style="font-size:0.9rem;font-weight:600;color:#1D1D1F;">
+            <i class="bi bi-clock-history me-2" style="color:#2563EB;"></i>Tracking History
+          </span>
+          <span class="diq-badge diq-badge-PLACED"
+                th:text="${#lists.size(timeline)} + ' events'">N</span>
+        </div>
+        <div class="diq-card-body">
+
+          <div th:if="${timeline == null or timeline.isEmpty()}" class="diq-empty">
+            <div class="empty-icon"><i class="bi bi-clock"></i></div>
+            <p class="empty-title">No events yet</p>
+            <p class="empty-desc">Status updates will appear here as the delivery progresses.</p>
+          </div>
+
+          <div th:unless="${timeline == null or timeline.isEmpty()}" class="diq-timeline">
+            <div th:each="event : ${timeline}" class="diq-timeline-item">
+              <div class="tl-spine">
+                <div class="tl-dot" th:classappend="'tl-dot-' + ${event.toStatus.name()}">
+                  <i class="bi"
+                     th:classappend="${event.toStatus.name() == 'DELIVERED'       ? 'bi-check-lg'        :
+                                      event.toStatus.name() == 'FAILED'           ? 'bi-x-lg'            :
+                                      event.toStatus.name() == 'OUT_FOR_DELIVERY' ? 'bi-truck'           :
+                                      event.toStatus.name() == 'ASSIGNED'         ? 'bi-person-check'    :
+                                      event.toStatus.name() == 'RESCHEDULED'      ? 'bi-arrow-clockwise' :
+                                      'bi-circle'}">
+                  </i>
+                </div>
+              </div>
+              <div class="tl-content">
+                <p class="tl-status" th:text="${event.toStatus.name().replace('_',' ')}">STATUS</p>
+                <div class="tl-meta">
+                  <span>
+                    <i class="bi bi-clock" style="font-size:0.75rem;"></i>
+                    <span th:text="${#temporals.format(event.timestamp,'dd MMM yyyy, HH:mm')}">Time</span>
+                  </span>
+                  <span th:if="${event.updatedBy != null}">
+                    <i class="bi bi-person" style="font-size:0.75rem;"></i>
+                    <span th:text="${event.updatedBy.name}">Agent</span>
+                  </span>
+                </div>
+                <div class="tl-note"
+                     th:if="${event.note != null and !#strings.isEmpty(event.note)}"
+                     th:text="${event.note}">Note</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div th:replace="~{fragments/layout :: scripts}"></div>
+</body>
+</html>
