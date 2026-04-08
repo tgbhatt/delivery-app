@@ -240,6 +240,33 @@ public class DeliveryRequest {
         this.specialInstructions = specialInstructions;
     }
 
+    // ---- Alias getters for Thymeleaf templates ----
+    // The HTML templates were written using short, friendly field names like
+    // "pickupAddress" and "currentStatus". The actual model fields have longer,
+    // more descriptive names. These alias getters bridge that gap — Thymeleaf
+    // calls ${order.pickupAddress} which invokes getPickupAddress() below.
+    // This way the templates stay readable and we don't rename the real fields.
+
+    // Templates use: ${order.pickupAddress}
+    public String getPickupAddress() {
+        return restaurantAddress;
+    }
+
+    // Templates use: ${order.deliveryAddress}
+    public String getDeliveryAddress() {
+        return customerAddress;
+    }
+
+    // Templates use: ${order.packageDescription}
+    public String getPackageDescription() {
+        return orderDescription;
+    }
+
+    // Templates use: ${order.currentStatus}
+    public DeliveryStatusEnum getCurrentStatus() {
+        return status;
+    }
+
     @Override
     public String toString() {
         return "DeliveryRequest{id=" + id +

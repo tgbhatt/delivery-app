@@ -96,6 +96,12 @@ public class TimeSlot {
         return slotDate;
     }
 
+    // Alias getter for templates: ${slot.date} calls this method
+    // The HTML templates use "slot.date" which is shorter and clearer to read
+    public LocalDate getDate() {
+        return slotDate;
+    }
+
     public void setSlotDate(LocalDate slotDate) {
         this.slotDate = slotDate;
     }
@@ -146,6 +152,39 @@ public class TimeSlot {
 
     public void setBookedCount(int bookedCount) {
         this.bookedCount = bookedCount;
+    }
+
+    // ---- Business Logic Methods ----
+
+    /**
+     * Returns true if this slot can still accept a new booking.
+     *
+     * A slot is bookable when:
+     *   1. available = true (not manually closed by admin)
+     *   2. bookedCount has not yet reached capacity
+     *
+     * Used by DeliveryBookingService before accepting a scheduled order.
+     * This is business logic kept inside the model — the model "knows" its own rules.
+     */
+    public boolean isBookable() {
+        return available && bookedCount < capacity;
+    }
+
+    /**
+     * Consumes one unit of capacity in this slot.
+     *
+     * Called when a customer successfully books into this slot.
+     * If the slot becomes full after this booking, available is set to false
+     * so no further bookings are accepted.
+     *
+     * @Transactional in the calling service ensures this is saved atomically
+     * along with the new order record — either both succeed or neither does.
+     */
+    public void incrementBookedCount() {
+        bookedCount++;
+        if (bookedCount >= capacity) {
+            available = false;  // automatically close the slot when full
+        }
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.bt.deliveryapp.repository;
 
 import com.bt.deliveryapp.enums.DeliveryStatusEnum;
+import com.bt.deliveryapp.enums.Priority;
 import com.bt.deliveryapp.model.Agent;
 import com.bt.deliveryapp.model.DeliveryRequest;
 import com.bt.deliveryapp.model.User;
@@ -51,6 +52,11 @@ public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest
     // Used by the agent dashboard (Feature 5) to show their deliveries
     List<DeliveryRequest> findByAgent(Agent agent);
 
+    // Get all orders assigned to a specific agent, newest first
+    // Used by DeliveryAgentService.getAssignedOrders()
+    // SQL generated: SELECT * FROM delivery_requests WHERE agent_id = ? ORDER BY created_at DESC
+    List<DeliveryRequest> findByAgentOrderByCreatedAtDesc(Agent agent);
+
     // Get all immediate orders (Order Now) at a given status
     // Used by admin dashboard to show the live feed
     List<DeliveryRequest> findByIsImmediateAndStatus(boolean isImmediate, DeliveryStatusEnum status);
@@ -58,4 +64,36 @@ public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest
     // Get all orders for a specific agent at a given status
     // e.g. all OUT_FOR_DELIVERY orders for agent X
     List<DeliveryRequest> findByAgentAndStatus(Agent agent, DeliveryStatusEnum status);
+
+    // ---- Methods added to support DeliveryBookingService (Feature 1) ----
+
+    // All orders placed by a customer, newest first — used for "My Orders" page
+    // SQL generated: SELECT * FROM delivery_requests WHERE customer_id = ? ORDER BY created_at DESC
+    List<DeliveryRequest> findByCustomerOrderByCreatedAtDesc(User customer);
+
+    // ---- Methods added to support DashboardService (Feature 5) ----
+
+    // All orders filtered by whether they are immediate (true) or scheduled (false)
+    // DashboardService calls findByIsImmediate(true) for the live feed
+    // and findByIsImmediate(false) for the scheduled queue
+    // SQL generated: SELECT * FROM delivery_requests WHERE is_immediate = ?
+    List<DeliveryRequest> findByIsImmediate(boolean isImmediate);
+
+    // ---- Methods added to support RouteOptimisationService (Feature 3) ----
+
+    // COUNT how many orders an agent has with a given status — faster than loading all objects
+    // SQL generated: SELECT COUNT(*) FROM delivery_requests WHERE agent_id = ? AND status = ?
+    long countByAgentAndStatus(Agent agent, DeliveryStatusEnum status);
+
+    // COUNT how many orders in a given pickup zone have a given status
+    // Used by getZoneStats() to show the admin a snapshot of orders per zone
+    // SQL generated: SELECT COUNT(*) FROM delivery_requests WHERE status = ? AND pickup_zone = ?
+    long countByStatusAndPickupZone(DeliveryStatusEnum status, String pickupZone);
+
+    // All orders with a given priority — used by slot scheduling
+    List<DeliveryRequest> findByPriority(Priority priority);
+
+    // All orders at a status, sorted by priority descending — URGENT orders first
+    // SQL generated: SELECT * FROM delivery_requests WHERE status = ? ORDER BY priority DESC
+    List<DeliveryRequest> findByStatusOrderByPriorityDesc(DeliveryStatusEnum status);
 }

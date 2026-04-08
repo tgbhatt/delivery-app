@@ -1,8 +1,8 @@
 package com.bt.deliveryapp.service;
 
 import com.bt.deliveryapp.enums.DeliveryStatusEnum;
+import com.bt.deliveryapp.model.Agent;
 import com.bt.deliveryapp.model.DeliveryRequest;
-import com.bt.deliveryapp.model.User;
 import com.bt.deliveryapp.repository.DeliveryRequestRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -65,7 +65,7 @@ public class DeliveryAgentService {
      * @param agent the logged-in delivery agent
      * @return list of orders assigned to this agent
      */
-    public List<DeliveryRequest> getAssignedOrders(User agent) {
+    public List<DeliveryRequest> getAssignedOrders(Agent agent) {
         // DeliveryRequest has an 'agent' field (a User with role AGENT).
         // This query finds all orders where agent_id = this agent's id
         // AND status is ASSIGNED (ready to pick up) or OUT_FOR_DELIVERY (already picked up).
@@ -93,7 +93,7 @@ public class DeliveryAgentService {
      * @return the updated order, or empty if the transition was not allowed
      */
     @Transactional
-    public Optional<DeliveryRequest> markPickedUp(Long orderId, User agent) {
+    public Optional<DeliveryRequest> markPickedUp(Long orderId, Agent agent) {
         Optional<DeliveryRequest> orderOpt = deliveryRequestRepository.findById(orderId);
 
         if (orderOpt.isEmpty()) {
@@ -134,7 +134,7 @@ public class DeliveryAgentService {
      * @return the updated order, or empty if the transition was not allowed
      */
     @Transactional
-    public Optional<DeliveryRequest> markDelivered(Long orderId, User agent) {
+    public Optional<DeliveryRequest> markDelivered(Long orderId, Agent agent) {
         Optional<DeliveryRequest> orderOpt = deliveryRequestRepository.findById(orderId);
 
         if (orderOpt.isEmpty()) {
@@ -173,7 +173,7 @@ public class DeliveryAgentService {
      * @return the updated order, or empty if the transition was not allowed
      */
     @Transactional
-    public Optional<DeliveryRequest> markFailed(Long orderId, User agent) {
+    public Optional<DeliveryRequest> markFailed(Long orderId, Agent agent) {
         Optional<DeliveryRequest> orderOpt = deliveryRequestRepository.findById(orderId);
 
         if (orderOpt.isEmpty()) {
@@ -207,7 +207,7 @@ public class DeliveryAgentService {
      * @param agent the logged-in agent
      * @return list of DELIVERED orders for this agent
      */
-    public List<DeliveryRequest> getDeliveryHistory(User agent) {
+    public List<DeliveryRequest> getDeliveryHistory(Agent agent) {
         return deliveryRequestRepository.findByAgentAndStatus(agent, DeliveryStatusEnum.DELIVERED);
     }
 }
