@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head(title='Admin Dashboard')}">
+</head>
+<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="diq-container">
+
+  <!-- Flash messages -->
+  <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
+
+  <!-- ── Page Header ──────────────────────────────────────── -->
+  <div style="margin-bottom:2rem;">
+    <p class="diq-label" style="margin-bottom:0.25rem;">Admin Dashboard</p>
+    <h1 style="font-size:1.625rem;font-weight:700;letter-spacing:-0.02em;margin:0;">Operations Overview</h1>
+  </div>
+
+  <!-- ── Stats Bar ─────────────────────────────────────────── -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:2rem;">
+
+    <div class="diq-stat-card">
+      <div class="stat-icon stat-icon-blue"><i class="bi bi-lightning-charge-fill"></i></div>
+      <div>
+        <div class="stat-value" data-count-to="${totalActive}" th:text="${totalActive}">0</div>
+        <div class="stat-label">Total Active</div>
+      </div>
+    </div>
+
+    <div class="diq-stat-card">
+      <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle-fill"></i></div>
+      <div>
+        <div class="stat-value" data-count-to="${deliveredToday}" th:text="${deliveredToday}">0</div>
+        <div class="stat-label">Delivered Today</div>
+      </div>
+    </div>
+
+    <div class="diq-stat-card">
+      <div class="stat-icon stat-icon-red"><i class="bi bi-x-circle-fill"></i></div>
+      <div>
+        <div class="stat-value" data-count-to="${failedToday}" th:text="${failedToday}">0</div>
+        <div class="stat-label">Failed Today</div>
+      </div>
+    </div>
+
+    <div class="diq-stat-card">
+      <div class="stat-icon stat-icon-yellow"><i class="bi bi-person-plus-fill"></i></div>
+      <div>
+        <div class="stat-value" data-count-to="${pendingAssignment}" th:text="${pendingAssignment}">0</div>
+        <div class="stat-label">Pending Assignment</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Filter Bar ─────────────────────────────────────────── -->
+  <div class="diq-filter-bar" style="margin-bottom:1.75rem;">
+    <form th:action="@{/admin/dashboard}" method="get" style="display:contents;">
+
+      <div class="filter-group">
+        <label>Status</label>
+        <select name="status" class="diq-select">
+          <option value="">All statuses</option>
+          <option th:each="s : ${T(com.bt.deliveryapp.enums.DeliveryStatusEnum).values()}"
+                  th:value="${s.name()}"
+                  th:text="${s.name().replace('_',' ')}"
+                  th:selected="${filterStatus != null and filterStatus == s.name()}">
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Type</label>
+        <select name="isImmediate" class="diq-select">
+          <option value="">All types</option>
+          <option value="true"  th:selected="${filterIsImmediate != null and filterIsImmediate}">⚡ Immediate</option>
+          <option value="false" th:selected="${filterIsImmediate != null and !filterIsImmediate}">📅 Scheduled</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Agent</label>
+        <select name="agentId" class="diq-select">
+          <option value="">All agents</option>
+          <option th:each="a : ${agents}"
+                  th:value="${a.id}"
+                  th:text="${a.user.name}"
+                  th:selected="${filterAgentId != null and filterAgentId == a.id}">
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-actions">
+        <button type="submit" class="diq-btn diq-btn-primary diq-btn-sm">
+          <i class="bi bi-funnel"></i> Apply
+        </button>
+        <a th:href="@{/admin/dashboard}" class="diq-btn diq-btn-secondary diq-btn-sm">
+          <i class="bi bi-x"></i> Clear
+        </a>
+        <span id="filterActiveBadge"
+              class="diq-badge diq-badge-ASSIGNED"
+              th:style="${isFilterActive} ? 'display:inline-flex' : 'display:none'">
+          Filtered
+        </span>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- ── Two-Column Panel ──────────────────────────────────── -->
+  <div class="row g-4">
+
+    <!-- LEFT: Live Orders (Immediate) ───────────────────── -->
+    <div class="col-12 col-xl-6">
+      <div class="diq-card" style="height:100%;">
+        <div class="diq-card-header">
+          <div style="display:flex;align-items:center;gap:0.625rem;">
+            <div style="width:28px;height:28px;border-radius:7px;background:#FFF7ED;color:#C2410C;display:flex;align-items:center;justify-content:center;font-size:0.875rem;">
+              <i class="bi bi-lightning-charge-fill"></i>
+            </div>
+            <span style="font-size:0.9375rem;font-weight:700;color:#1D1D1F;">Live Orders</span>
+          </div>
+          <span class="diq-badge diq-badge-immediate"
+                th:text="${#lists.size(liveOrders)} + ' orders'">N orders</span>
+        </div>
+
+        <!-- Empty state -->
+        <div th:if="${liveOrders == null or liveOrders.isEmpty()}" class="diq-empty">
+          <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+          <p class="empty-title">No live orders</p>
+          <p class="empty-desc">Immediate orders will appear here.</p>
+        </div>
+
+        <!-- Table -->
+        <div th:unless="${liveOrders == null or liveOrders.isEmpty()}"
+             class="diq-table-wrap" style="border:none;border-radius:0;">
+          <table class="diq-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Route</th>
+                <th>Status</th>
+                <th>Agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="order : ${liveOrders}">
+                <td>
+                  <a th:href="@{'/track/' + ${order.id}}"
+                     class="cell-id"
+                     th:text="'#' + ${order.id}"
+                     style="text-decoration:none;">
+                    #ID
+                  </a><br/>
+                  <span class="diq-badge"
+                        style="margin-top:0.25rem;"
+                        th:classappend="'diq-badge-priority-' + ${order.priority.name()}"
+                        th:text="${order.priority.name()}">P</span>
+                </td>
+                <td>
+                  <div class="cell-addr" th:text="${order.pickupAddress}" style="color:#6E6E73;font-size:0.75rem;">From</div>
+                  <div style="font-size:0.75rem;color:#6E6E73;margin:0.1rem 0;">↓</div>
+                  <div class="cell-addr" th:text="${order.deliveryAddress}" style="font-size:0.75rem;">To</div>
+                </td>
+                <td>
+                  <span class="diq-badge"
+                        th:classappend="'diq-badge-' + ${order.currentStatus.name()}"
+                        th:text="${order.currentStatus.name().replace('_',' ')}">STATUS</span>
+                </td>
+                <td>
+                  <div th:if="${order.agent != null}" style="font-size:0.8125rem;color:#1D1D1F;" th:text="${order.agent.user.name}">Agent</div>
+                  <!-- Assign form -->
+                  <form th:if="${order.agent == null}"
+                        th:action="@{/admin/assign}" method="post"
+                        class="assign-form" style="display:flex;gap:0.375rem;align-items:center;">
+                    <input type="hidden" name="orderId" th:value="${order.id}" />
+                    <select name="agentId" class="diq-select" style="padding:0.3rem 1.75rem 0.3rem 0.5rem;font-size:0.8rem;min-width:100px;">
+                      <option value="">Assign…</option>
+                      <option th:each="a : ${agents}" th:value="${a.id}" th:text="${a.user.name}"></option>
+                    </select>
+                    <button type="submit" class="diq-btn diq-btn-primary diq-btn-sm" disabled>
+                      <i class="bi bi-check"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Scheduled Orders ─────────────────────────── -->
+    <div class="col-12 col-xl-6">
+      <div class="diq-card" style="height:100%;">
+        <div class="diq-card-header">
+          <div style="display:flex;align-items:center;gap:0.625rem;">
+            <div style="width:28px;height:28px;border-radius:7px;background:#F0FDF4;color:#16A34A;display:flex;align-items:center;justify-content:center;font-size:0.875rem;">
+              <i class="bi bi-calendar-check"></i>
+            </div>
+            <span style="font-size:0.9375rem;font-weight:700;color:#1D1D1F;">Scheduled Queue</span>
+          </div>
+          <span class="diq-badge diq-badge-scheduled"
+                th:text="${#lists.size(scheduledOrders)} + ' orders'">N orders</span>
+        </div>
+
+        <!-- Empty state -->
+        <div th:if="${scheduledOrders == null or scheduledOrders.isEmpty()}" class="diq-empty">
+          <div class="empty-icon"><i class="bi bi-calendar3"></i></div>
+          <p class="empty-title">Queue is empty</p>
+          <p class="empty-desc">Scheduled orders will appear here.</p>
+        </div>
+
+        <!-- Table -->
+        <div th:unless="${scheduledOrders == null or scheduledOrders.isEmpty()}"
+             class="diq-table-wrap" style="border:none;border-radius:0;">
+          <table class="diq-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Route</th>
+                <th>Status</th>
+                <th>Agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="order : ${scheduledOrders}">
+                <td>
+                  <a th:href="@{'/track/' + ${order.id}}"
+                     class="cell-id"
+                     th:text="'#' + ${order.id}"
+                     style="text-decoration:none;">
+                    #ID
+                  </a><br/>
+                  <div th:if="${order.timeSlot != null}"
+                       style="font-size:0.75rem;color:#15803D;margin-top:0.25rem;">
+                    <i class="bi bi-clock"></i>
+                    <span th:text="${#temporals.format(order.timeSlot.date,'dd MMM')} + ' · ' + ${order.timeSlot.startTime}">Slot</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="cell-addr" th:text="${order.pickupAddress}" style="color:#6E6E73;font-size:0.75rem;">From</div>
+                  <div style="font-size:0.75rem;color:#6E6E73;margin:0.1rem 0;">↓</div>
+                  <div class="cell-addr" th:text="${order.deliveryAddress}" style="font-size:0.75rem;">To</div>
+                </td>
+                <td>
+                  <span class="diq-badge"
+                        th:classappend="'diq-badge-' + ${order.currentStatus.name()}"
+                        th:text="${order.currentStatus.name().replace('_',' ')}">STATUS</span>
+                </td>
+                <td>
+                  <div th:if="${order.agent != null}" style="font-size:0.8125rem;color:#1D1D1F;" th:text="${order.agent.user.name}">Agent</div>
+                  <form th:if="${order.agent == null}"
+                        th:action="@{/admin/assign}" method="post"
+                        class="assign-form" style="display:flex;gap:0.375rem;align-items:center;">
+                    <input type="hidden" name="orderId" th:value="${order.id}" />
+                    <select name="agentId" class="diq-select" style="padding:0.3rem 1.75rem 0.3rem 0.5rem;font-size:0.8rem;min-width:100px;">
+                      <option value="">Assign…</option>
+                      <option th:each="a : ${agents}" th:value="${a.id}" th:text="${a.user.name}"></option>
+                    </select>
+                    <button type="submit" class="diq-btn diq-btn-primary diq-btn-sm" disabled>
+                      <i class="bi bi-check"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div th:replace="~{fragments/layout :: scripts}"></div>
+</body>
+</html>

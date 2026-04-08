@@ -63,13 +63,6 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
 
-    // ---- Current location zone (for agents) ----
-    // Stores which zone the agent is currently in: NORTH, SOUTH, EAST, WEST, CENTRAL
-    // Used by RouteOptimisationService to match agents to nearby orders
-    // Null for customers and admins — only meaningful for agents
-    @Column(length = 50)
-    private String currentLocation;
-
     // ---- Constructors ----
     // A constructor is a special method called when you create a new User object.
     // We always need a no-argument constructor for JPA (it uses it internally).
@@ -136,14 +129,6 @@ public class User {
 
     public void setRole(UserRole role) {
         this.role = role;
-    }
-
-    public String getCurrentLocation() {
-        return currentLocation;
-    }
-
-    public void setCurrentLocation(String currentLocation) {
-        this.currentLocation = currentLocation;
     }
 
     // ---- toString ----

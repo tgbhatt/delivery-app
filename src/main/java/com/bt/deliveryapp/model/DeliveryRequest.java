@@ -80,12 +80,6 @@ public class DeliveryRequest {
     @JoinColumn(name = "agent_id")
     private Agent agent;
 
-    // ---- Pickup zone for zone-based route optimisation ----
-    // Stores which zone the restaurant/pickup address is in: NORTH, SOUTH, EAST, WEST, CENTRAL
-    // Set when the order is placed. Used by Feature 3 to match nearby agents.
-    @Column(length = 50)
-    private String pickupZone;
-
     // ---- Current status of this order ----
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -244,38 +238,6 @@ public class DeliveryRequest {
 
     public void setSpecialInstructions(String specialInstructions) {
         this.specialInstructions = specialInstructions;
-    }
-
-    public String getPickupZone() {
-        return pickupZone;
-    }
-
-    public void setPickupZone(String pickupZone) {
-        this.pickupZone = pickupZone;
-    }
-
-    // ---- Template alias getters ----
-    // These provide convenient names used in the Thymeleaf HTML templates.
-    // They simply delegate to the existing getter methods above.
-
-    /** Alias for getStatus() — used in customer/orders.html */
-    public DeliveryStatusEnum getCurrentStatus() {
-        return status;
-    }
-
-    /** Alias for getRestaurantAddress() — used in customer/orders.html */
-    public String getPickupAddress() {
-        return restaurantAddress;
-    }
-
-    /** Alias for getCustomerAddress() — used in customer/orders.html */
-    public String getDeliveryAddress() {
-        return customerAddress;
-    }
-
-    /** Alias for getOrderDescription() — used in customer/orders.html */
-    public String getPackageDescription() {
-        return orderDescription;
     }
 
     @Override

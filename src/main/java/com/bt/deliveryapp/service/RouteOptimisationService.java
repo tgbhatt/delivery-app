@@ -2,10 +2,8 @@ package com.bt.deliveryapp.service;
 
 import com.bt.deliveryapp.enums.DeliveryStatusEnum;
 import com.bt.deliveryapp.enums.UserRole;
-import com.bt.deliveryapp.model.Agent;
 import com.bt.deliveryapp.model.DeliveryRequest;
 import com.bt.deliveryapp.model.User;
-import com.bt.deliveryapp.repository.AgentRepository;
 import com.bt.deliveryapp.repository.DeliveryRequestRepository;
 import com.bt.deliveryapp.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -80,18 +78,15 @@ public class RouteOptimisationService {
 
     private final DeliveryRequestRepository deliveryRequestRepository;
     private final UserRepository userRepository;
-    private final AgentRepository agentRepository;
 
     // ---- Constructor Injection ----
     // Spring sees this constructor and automatically passes in the repositories.
     // The "final" keyword on the fields means they can only be set once (here, in the constructor).
     // This is called "immutability" — another good OOP practice.
     public RouteOptimisationService(DeliveryRequestRepository deliveryRequestRepository,
-                                    UserRepository userRepository,
-                                    AgentRepository agentRepository) {
+                                    UserRepository userRepository) {
         this.deliveryRequestRepository = deliveryRequestRepository;
         this.userRepository = userRepository;
-        this.agentRepository = agentRepository;
     }
 
     // =========================================================================
@@ -214,17 +209,11 @@ public class RouteOptimisationService {
             );
         }
 
-        // Step 5: Look up the Agent profile for this User
-        // DeliveryRequest stores an Agent entity (operational profile), not just a User.
-        Agent agentProfile = agentRepository.findByUser(agent)
-                .orElseThrow(() -> new RuntimeException(
-                        "No agent profile found for user: " + agentId));
-
-        // Step 6: Perform the assignment — update two fields on the order
-        order.setAgent(agentProfile);                   // link the agent profile to this order
+        // Step 5: Perform the assignment — update two fields on the order
+        order.setAgent(agent);                          // link the agent to this order
         order.setStatus(DeliveryStatusEnum.ASSIGNED);   // advance the state machine
 
-        // Step 7: Save and return the updated order
+        // Step 6: Save and return the updated order
         // Spring Data JPA generates: UPDATE delivery_requests SET agent_id=?, status=? WHERE id=?
         return deliveryRequestRepository.save(order);
     }
@@ -280,12 +269,8 @@ public class RouteOptimisationService {
                 continue;  // 'continue' skips the rest of this loop iteration
             }
 
-            // Look up the Agent profile (operational record) for this User
-            Agent agentProfile = agentRepository.findByUser(chosenAgent).orElse(null);
-            if (agentProfile == null) continue;
-
             // Assign the chosen agent to this order
-            order.setAgent(agentProfile);
+            order.setAgent(chosenAgent);
             order.setStatus(DeliveryStatusEnum.ASSIGNED);
             deliveryRequestRepository.save(order);
 
@@ -316,13 +301,11 @@ public class RouteOptimisationService {
         final int MAX_ACTIVE_ORDERS = 3;
 
         for (User agent : agents) {
-            // Look up the Agent profile — repo methods need Agent, not User
-            Agent agentProfile = agentRepository.findByUser(agent).orElse(null);
-            if (agentProfile == null) continue;
-
             // Count how many orders this agent currently has in ASSIGNED status
+            // findByAgentAndStatus() is already defined in DeliveryRequestRepository
             long activeCount = deliveryRequestRepository
-                    .countByAgentAndStatus(agentProfile, DeliveryStatusEnum.ASSIGNED);
+                    .findByAgentAndStatus(agent, DeliveryStatusEnum.ASSIGNED)
+                    .size();
 
             // If this agent has room, return them immediately (greedy: first fit)
             if (activeCount < MAX_ACTIVE_ORDERS) {
@@ -396,11 +379,9 @@ public class RouteOptimisationService {
                 "User " + agentId + " is not an agent (role is " + agent.getRole() + ")");
         }
 
-        // Step 3: Look up the Agent profile, then count their active (ASSIGNED) orders
+        // Step 3: Count and return their active (ASSIGNED) orders
         // This runs: SELECT COUNT(*) FROM delivery_requests WHERE agent_id = ? AND status = 'ASSIGNED'
-        Agent agentProfile = agentRepository.findByUser(agent)
-                .orElseThrow(() -> new RuntimeException("No agent profile found for user: " + agentId));
-        return deliveryRequestRepository.countByAgentAndStatus(agentProfile, DeliveryStatusEnum.ASSIGNED);
+        return deliveryRequestRepository.countByAgentAndStatus(agent, DeliveryStatusEnum.ASSIGNED);
     }
 
     /**
@@ -436,11 +417,9 @@ public class RouteOptimisationService {
         Map<String, Long> workloadMap = new LinkedHashMap<>();
 
         for (User agent : allAgents) {
-            // Look up Agent profile — count method needs Agent, not User
-            Agent agentProfile = agentRepository.findByUser(agent).orElse(null);
-            long activeCount = (agentProfile != null)
-                    ? deliveryRequestRepository.countByAgentAndStatus(agentProfile, DeliveryStatusEnum.ASSIGNED)
-                    : 0L;
+            // For each agent, ask the database: how many ASSIGNED orders do they have?
+            long activeCount = deliveryRequestRepository
+                    .countByAgentAndStatus(agent, DeliveryStatusEnum.ASSIGNED);
 
             // Put the name and count into the map
             workloadMap.put(agent.getName(), activeCount);
@@ -516,11 +495,8 @@ public class RouteOptimisationService {
                 continue;
             }
 
-            // Look up Agent profile and assign
-            Agent agentProfile = agentRepository.findByUser(chosenAgent).orElse(null);
-            if (agentProfile == null) continue;
-
-            order.setAgent(agentProfile);
+            // Assign the agent and update the status
+            order.setAgent(chosenAgent);
             order.setStatus(DeliveryStatusEnum.ASSIGNED);
             deliveryRequestRepository.save(order);
             assignedOrders.add(order);
@@ -546,12 +522,9 @@ public class RouteOptimisationService {
      */
     private User findAgentUnderCap(List<User> agents, int maxOrdersPerAgent) {
         for (User agent : agents) {
-            // Look up Agent profile — repo count method needs Agent, not User
-            Agent agentProfile = agentRepository.findByUser(agent).orElse(null);
-            if (agentProfile == null) continue;
-
+            // Use the new COUNT query — no unnecessary object loading
             long activeCount = deliveryRequestRepository
-                    .countByAgentAndStatus(agentProfile, DeliveryStatusEnum.ASSIGNED);
+                    .countByAgentAndStatus(agent, DeliveryStatusEnum.ASSIGNED);
 
             if (activeCount < maxOrdersPerAgent) {
                 return agent;

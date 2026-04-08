@@ -1,10 +1,8 @@
 package com.bt.deliveryapp.service;
 
 import com.bt.deliveryapp.enums.DeliveryStatusEnum;
-import com.bt.deliveryapp.model.Agent;
 import com.bt.deliveryapp.model.DeliveryRequest;
 import com.bt.deliveryapp.model.User;
-import com.bt.deliveryapp.repository.AgentRepository;
 import com.bt.deliveryapp.repository.DeliveryRequestRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -51,9 +49,6 @@ public class DeliveryAgentService {
     @Autowired
     private DeliveryRequestRepository deliveryRequestRepository;
 
-    @Autowired
-    private AgentRepository agentRepository;
-
     // ─────────────────────────────────────────────────────────────────────────
     //  METHOD 1: Get all orders currently assigned to this agent
     // ─────────────────────────────────────────────────────────────────────────
@@ -71,14 +66,14 @@ public class DeliveryAgentService {
      * @return list of orders assigned to this agent
      */
     public List<DeliveryRequest> getAssignedOrders(User agent) {
-        // Look up the Agent profile linked to this User account.
-        // DeliveryRequest stores an Agent (operational profile), not just a User.
-        // AgentRepository.findByUser() gives us the Agent record for this logged-in user.
-        Agent agentProfile = agentRepository.findByUser(agent)
-                .orElseThrow(() -> new RuntimeException("No agent profile found for user: " + agent.getId()));
-
+        // DeliveryRequest has an 'agent' field (a User with role AGENT).
+        // This query finds all orders where agent_id = this agent's id
+        // AND status is ASSIGNED (ready to pick up) or OUT_FOR_DELIVERY (already picked up).
+        // We use the status-based query from our repository and filter by agent below.
+        // For now we use findByStatus — Feature 3 will assign agents properly.
+        // findByAgentOrderByCreatedAtDesc is defined in DeliveryRequestRepository.
         // Spring generates: SELECT * FROM delivery_requests WHERE agent_id = ? ORDER BY created_at DESC
-        return deliveryRequestRepository.findByAgentOrderByCreatedAtDesc(agentProfile);
+        return deliveryRequestRepository.findByAgentOrderByCreatedAtDesc(agent);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -108,8 +103,7 @@ public class DeliveryAgentService {
         DeliveryRequest order = orderOpt.get();
 
         // Ownership check: only the assigned agent can mark their own order
-        // order.getAgent() returns an Agent; we compare via the linked User ID
-        if (order.getAgent() == null || !order.getAgent().getUser().getId().equals(agent.getId())) {
+        if (order.getAgent() == null || !order.getAgent().getId().equals(agent.getId())) {
             return Optional.empty();
         }
 
@@ -214,8 +208,6 @@ public class DeliveryAgentService {
      * @return list of DELIVERED orders for this agent
      */
     public List<DeliveryRequest> getDeliveryHistory(User agent) {
-        Agent agentProfile = agentRepository.findByUser(agent)
-                .orElseThrow(() -> new RuntimeException("No agent profile found for user: " + agent.getId()));
-        return deliveryRequestRepository.findByAgentAndStatus(agentProfile, DeliveryStatusEnum.DELIVERED);
+        return deliveryRequestRepository.findByAgentAndStatus(agent, DeliveryStatusEnum.DELIVERED);
     }
 }

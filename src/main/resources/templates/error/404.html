@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head(title='Page Not Found')}">
+</head>
+<body class="diq-page" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F5F7;">
+
+<div style="text-align:center;padding:2rem;max-width:420px;">
+
+  <!-- Large 404 -->
+  <div style="font-size:clamp(5rem,15vw,8rem);font-weight:800;letter-spacing:-0.05em;
+              background:linear-gradient(135deg,#1E3A5F,#2563EB);
+              -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+              background-clip:text;line-height:1;margin-bottom:1rem;">
+    404
+  </div>
+
+  <h1 style="font-size:1.5rem;font-weight:700;color:#1D1D1F;letter-spacing:-0.02em;margin-bottom:0.625rem;">
+    Page not found
+  </h1>
+  <p style="font-size:0.9375rem;color:#6E6E73;margin-bottom:2rem;line-height:1.6;">
+    We couldn't find the page you're looking for. It may have moved, or the link might be incorrect.
+  </p>
+
+  <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+    <a href="javascript:history.back()" class="diq-btn diq-btn-secondary">
+      <i class="bi bi-arrow-left"></i> Go back
+    </a>
+    <a th:href="@{/login}" class="diq-btn diq-btn-primary">
+      <i class="bi bi-house"></i> Home
+    </a>
+  </div>
+
+</div>
+
+<div th:replace="~{fragments/layout :: scripts}"></div>
+</body>
+</html>

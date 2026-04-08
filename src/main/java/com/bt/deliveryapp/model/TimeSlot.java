@@ -148,36 +148,6 @@ public class TimeSlot {
         this.bookedCount = bookedCount;
     }
 
-    // ---- Template alias getter ----
-
-    /** Alias for getSlotDate() — used in customer/orders.html */
-    public LocalDate getDate() {
-        return slotDate;
-    }
-
-    // ---- Business logic methods ----
-
-    /**
-     * Returns true if this slot can still accept new bookings.
-     * A slot is bookable when it is marked available AND hasn't reached capacity.
-     * Used by SlotSchedulingService and ReschedulingService before assigning a slot.
-     */
-    public boolean isBookable() {
-        return available && bookedCount < capacity;
-    }
-
-    /**
-     * Increments the booked count by one.
-     * If the slot is now full (bookedCount == capacity), marks it unavailable.
-     * Called whenever an order is assigned to this slot.
-     */
-    public void incrementBookedCount() {
-        this.bookedCount++;
-        if (this.bookedCount >= this.capacity) {
-            this.available = false;
-        }
-    }
-
     @Override
     public String toString() {
         return "TimeSlot{id=" + id + ", date=" + slotDate + ", " + label +

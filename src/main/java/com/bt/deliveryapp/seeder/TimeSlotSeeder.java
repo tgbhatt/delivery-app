@@ -97,12 +97,10 @@ public class TimeSlotSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
 
-        // Check if there are already available slots from today onwards
-        // (not just "do any slots exist" — old slots from last week don't help anyone)
-        long futureCount = timeSlotRepository
-                .findBySlotDateGreaterThanEqualAndAvailableTrue(LocalDate.now()).size();
-        if (futureCount > 0) {
-            System.out.println("[TimeSlotSeeder] Future slots already exist (" + futureCount + " found). Skipping.");
+        // If slots already exist, do nothing
+        long existingCount = timeSlotRepository.count();
+        if (existingCount > 0) {
+            System.out.println("[TimeSlotSeeder] Slots already exist (" + existingCount + " found). Skipping.");
             return;
         }
 

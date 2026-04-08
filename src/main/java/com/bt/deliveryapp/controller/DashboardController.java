@@ -134,8 +134,7 @@ public class DashboardController {
         model.addAttribute("pendingAssignment", dashboardService.countPendingAssignment());
 
         // --- Step 5: Agent list for dropdowns ---
-        // Template references ${agents} for both filter dropdown and assign form
-        model.addAttribute("agents", dashboardService.getAllAgents());
+        model.addAttribute("allAgents", dashboardService.getAllAgents());
         model.addAttribute("availableAgents", dashboardService.getAvailableAgents());
 
         // --- Step 6: Order lists for the two panels ---
@@ -150,8 +149,6 @@ public class DashboardController {
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterIsImmediate", isImmediate);
         model.addAttribute("filterAgentId", agentId);
-        // Template references ${isFilterActive} for the "Filtered" badge
-        model.addAttribute("isFilterActive", filterApplied);
         model.addAttribute("filterApplied", filterApplied);
 
         return "admin-dashboard"; // → loads src/main/resources/templates/admin-dashboard.html

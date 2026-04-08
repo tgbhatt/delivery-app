@@ -58,25 +58,4 @@ public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest
     // Get all orders for a specific agent at a given status
     // e.g. all OUT_FOR_DELIVERY orders for agent X
     List<DeliveryRequest> findByAgentAndStatus(Agent agent, DeliveryStatusEnum status);
-
-    // Get all orders for a specific agent, sorted newest first
-    // Used by DeliveryAgentService to show agent their workload in order
-    List<DeliveryRequest> findByAgentOrderByCreatedAtDesc(Agent agent);
-
-    // Get all orders by order type (immediate vs scheduled) — used by DashboardService
-    List<DeliveryRequest> findByIsImmediate(boolean isImmediate);
-
-    // Get all orders at a given status, ordered by priority descending
-    // Used by SlotSchedulingService to process highest-priority orders first
-    List<DeliveryRequest> findByStatusOrderByPriorityDesc(DeliveryStatusEnum status);
-
-    // Count active orders for an agent — more efficient than loading full list
-    // Used by RouteOptimisationService workload checks
-    long countByAgentAndStatus(Agent agent, DeliveryStatusEnum status);
-
-    // Count scheduled orders by pickup zone — used by RouteOptimisationService zone stats
-    long countByStatusAndPickupZone(DeliveryStatusEnum status, String pickupZone);
-
-    // Get all orders for a customer, sorted newest first — used by DeliveryBookingService
-    List<DeliveryRequest> findByCustomerOrderByCreatedAtDesc(User customer);
 }

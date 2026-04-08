@@ -24,15 +24,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Find all users with a specific role — used by admin dashboard
     List<User> findByRole(UserRole role);
-
-    // Check if an email is already registered — used by RegisterService to prevent duplicates
-    boolean existsByEmail(String email);
-
-    // Find all users with a specific role, sorted A-Z by name
-    // Used by RouteOptimisationService to get a stable, sorted agent list
-    List<User> findByRoleOrderByNameAsc(UserRole role);
-
-    // Find all users with a specific role currently in a given zone
-    // Used by RouteOptimisationService for zone-based agent matching
-    List<User> findByRoleAndCurrentLocation(UserRole role, String currentLocation);
 }

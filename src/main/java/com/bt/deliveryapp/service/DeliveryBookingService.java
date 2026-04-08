@@ -93,28 +93,35 @@ public class DeliveryBookingService {
     public DeliveryRequest placeImmediateOrder(User customer,
                                                String restaurantAddress,
                                                String customerAddress,
-                                               String orderDescription,
-                                               String priorityStr,
-                                               String specialInstructions) {
+                                               String orderDescription) {
 
         // --- Validation ---
+        // We check the inputs before doing anything. If something is wrong,
+        // we throw an IllegalArgumentException which will be caught by the Controller.
         validateOrderInputs(restaurantAddress, customerAddress, orderDescription);
 
-        // --- Parse priority (default HIGH for immediate if not provided) ---
-        Priority priority = parsePriority(priorityStr, Priority.HIGH);
-
         // --- Create the delivery request ---
+        // We use the "immediate" constructor from DeliveryRequest.java.
+        // We pass Priority.HIGH because Order Now is always urgent,
+        // and null for specialInstructions (the UI can add this later).
         DeliveryRequest order = new DeliveryRequest(
                 customer,
                 restaurantAddress,
                 customerAddress,
                 orderDescription,
-                priority,
-                specialInstructions
+                Priority.HIGH,     // immediate orders are always high priority
+                null               // no special instructions at this stage
         );
 
+        // --- Override status to PLACED ---
+        // The constructor already sets PLACED, but we set it explicitly here
+        // so the code is clear about what state an immediate order starts in.
         order.setStatus(DeliveryStatusEnum.PLACED);
 
+        // --- Save to database and return ---
+        // repository.save() does an INSERT if the object has no id yet,
+        // or an UPDATE if it already has an id. Since this is new, it INSERTs.
+        // After saving, the 'id' field in the returned object will be populated.
         return deliveryRequestRepository.save(order);
     }
 
@@ -151,17 +158,14 @@ public class DeliveryBookingService {
                                                String restaurantAddress,
                                                String customerAddress,
                                                String orderDescription,
-                                               String priorityStr,
-                                               String specialInstructions,
                                                Long timeSlotId) {
 
         // --- Validate text inputs ---
         validateOrderInputs(restaurantAddress, customerAddress, orderDescription);
 
-        // --- Parse priority (default MEDIUM for scheduled if not provided) ---
-        Priority priority = parsePriority(priorityStr, Priority.MEDIUM);
-
         // --- Find the chosen time slot ---
+        // Optional<TimeSlot> is like a box that may or may not contain a TimeSlot.
+        // It prevents NullPointerException if the slot id doesn't exist in the database.
         Optional<TimeSlot> slotOpt = timeSlotRepository.findById(timeSlotId);
 
         if (slotOpt.isEmpty()) {
@@ -171,27 +175,41 @@ public class DeliveryBookingService {
         TimeSlot slot = slotOpt.get();
 
         // --- Check the slot is still bookable ---
+        // isBookable() is the business logic method we wrote in TimeSlot.java:
+        //   return available && bookedCount < capacity;
         if (!slot.isBookable()) {
             throw new IllegalArgumentException(
                     "Sorry, the slot '" + slot.getLabel() + "' is now full. Please choose a different slot.");
         }
 
         // --- Create the order with the slot attached ---
+        // We use the "scheduled" constructor from DeliveryRequest.java.
+        // It sets: immediate = false, timeSlot = slot, createdAt = now.
+        // Scheduled orders are MEDIUM priority — they have a planned window,
+        // so less urgent than immediate orders.
         DeliveryRequest order = new DeliveryRequest(
                 customer,
                 restaurantAddress,
                 customerAddress,
                 orderDescription,
-                priority,
-                slot,
-                specialInstructions
+                Priority.MEDIUM,   // scheduled orders are medium priority
+                slot,              // the time slot the customer chose
+                null               // no special instructions at this stage
         );
 
+        // --- Override status to SCHEDULED ---
+        // The constructor sets PLACED by default, but scheduled orders
+        // should start as SCHEDULED to distinguish them clearly.
         order.setStatus(DeliveryStatusEnum.SCHEDULED);
 
+        // --- Update the slot's booked count ---
+        // This is the business rule: consuming a slot means incrementing its count.
+        // If count reaches capacity, the slot is automatically marked unavailable
+        // inside the incrementBookedCount() method (we wrote this in TimeSlot.java).
         slot.incrementBookedCount();
-        timeSlotRepository.save(slot);
+        timeSlotRepository.save(slot);   // save the updated slot
 
+        // --- Save and return the order ---
         return deliveryRequestRepository.save(order);
     }
 
@@ -308,14 +326,6 @@ public class DeliveryBookingService {
         return timeSlotRepository.findBySlotDateAndAvailableTrue(date);
     }
 
-    /**
-     * Returns all available time slots from today onwards (for the booking dropdown).
-     * Used by the booking form to show customers what they can choose from.
-     */
-    public List<TimeSlot> getUpcomingAvailableSlots() {
-        return timeSlotRepository.findBySlotDateGreaterThanEqualAndAvailableTrue(LocalDate.now());
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
     //  METHOD 6: Permanently delete an order (completing CRUD — Delete)
     // ─────────────────────────────────────────────────────────────────────────
@@ -390,22 +400,6 @@ public class DeliveryBookingService {
         }
         if (orderDescription == null || orderDescription.trim().isEmpty()) {
             throw new IllegalArgumentException("Order description cannot be empty.");
-        }
-    }
-
-    /**
-     * Safely converts a priority string (e.g. "HIGH", "MEDIUM", "LOW") from the form
-     * into the Priority enum. Falls back to the supplied default if the string is
-     * null, blank, or unrecognised.
-     */
-    private Priority parsePriority(String priorityStr, Priority defaultPriority) {
-        if (priorityStr == null || priorityStr.trim().isEmpty()) {
-            return defaultPriority;
-        }
-        try {
-            return Priority.valueOf(priorityStr.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return defaultPriority;
         }
     }
 }
