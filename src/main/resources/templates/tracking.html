@@ -4,6 +4,7 @@
 </head>
 <body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
 
+
 <nav th:replace="~{fragments/layout :: navbar}"></nav>
 
 <div class="diq-container-sm" style="margin-top:0.5rem;">
@@ -249,7 +250,80 @@
     </div>
 
   </div>
+
+  <!-- ── GPS Map ───────────────────────────────────────────── -->
+  <div class="diq-card" style="margin-top:1.5rem;">
+    <div class="diq-card-header">
+      <span style="font-size:0.9rem;font-weight:600;color:#1D1D1F;">
+        <i class="bi bi-map me-2" style="color:#2563EB;"></i>Route Map
+      </span>
+    </div>
+    <div class="diq-card-body" style="padding:0;">
+
+      <!-- Legend -->
+      <div style="display:flex;gap:1.25rem;padding:0.75rem 1.25rem;border-bottom:1px solid #E5E5EA;flex-wrap:wrap;">
+        <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.8125rem;color:#1D1D1F;">
+          <span style="width:12px;height:12px;border-radius:50%;background:#2563EB;display:inline-block;"></span>
+          Pickup: <strong th:text="${order.pickupAddress}">—</strong>
+        </span>
+        <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.8125rem;color:#1D1D1F;">
+          <span style="width:12px;height:12px;border-radius:50%;background:#16A34A;display:inline-block;"></span>
+          Delivery: <strong th:text="${order.deliveryAddress}">—</strong>
+        </span>
+      </div>
+
+      <!-- Loading spinner shown while geocoding -->
+      <div id="map-loading" style="height:360px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.75rem;background:#F5F5F7;">
+        <div style="width:32px;height:32px;border:3px solid #E5E5EA;border-top-color:#2563EB;border-radius:50%;animation:diq-spin 0.8s linear infinite;"></div>
+        <p style="font-size:0.875rem;color:#6E6E73;margin:0;">Loading map…</p>
+      </div>
+      <style>@keyframes diq-spin{to{transform:rotate(360deg)}}</style>
+
+      <!-- Map container — hidden until iframe loads -->
+      <iframe id="delivery-map" width="100%" height="360" frameborder="0" allowfullscreen=""
+              style="display:none;border-radius:0 0 12px 12px;border:0;"></iframe>
+
+      <!-- Error state -->
+      <div id="map-error" style="display:none;height:120px;align-items:center;justify-content:center;padding:1.5rem;text-align:center;font-size:0.875rem;color:#6E6E73;"></div>
+    </div>
+  </div>
+
 </div>
+
+<!-- Addresses passed from Thymeleaf to JS via hidden element -->
+<div id="map-data"
+     th:attr="data-pickup=${order.pickupAddress}, data-delivery=${order.deliveryAddress}"
+     style="display:none;"></div>
+
+<script>
+(function () {
+  var el       = document.getElementById('map-data');
+  var pickup   = el ? el.getAttribute('data-pickup')   : '';
+  var delivery = el ? el.getAttribute('data-delivery') : '';
+  var loading  = document.getElementById('map-loading');
+  var frame    = document.getElementById('delivery-map');
+  var errBox   = document.getElementById('map-error');
+
+  if (!pickup || !delivery) {
+    if (loading) loading.style.display = 'none';
+    if (errBox)  { errBox.style.display = 'flex'; errBox.textContent = 'No addresses available for this order.'; }
+    return;
+  }
+
+  // Google Maps directions embed — no API key, no external JS library, no CDN blocking page load
+  var src = 'https://maps.google.com/maps?saddr='
+          + encodeURIComponent(pickup)
+          + '&daddr='
+          + encodeURIComponent(delivery)
+          + '&output=embed';
+
+  frame.onload = function () {
+    if (loading) loading.style.display = 'none';
+    frame.style.display = 'block';
+  };
+  frame.src = src;
+}());
+</script>
 
 <div th:replace="~{fragments/layout :: scripts}"></div>
 </body>
