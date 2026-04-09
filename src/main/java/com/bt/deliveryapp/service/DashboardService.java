@@ -1,14 +1,21 @@
 package com.bt.deliveryapp.service;
 
 import com.bt.deliveryapp.enums.DeliveryStatusEnum;
+import com.bt.deliveryapp.enums.UserRole;
 import com.bt.deliveryapp.model.Agent;
 import com.bt.deliveryapp.model.DeliveryRequest;
+import com.bt.deliveryapp.model.User;
+import com.bt.deliveryapp.model.TrackingEvent;
 import com.bt.deliveryapp.repository.AgentRepository;
 import com.bt.deliveryapp.repository.DeliveryRequestRepository;
+import com.bt.deliveryapp.repository.TrackingEventRepository;
+import com.bt.deliveryapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,12 +46,18 @@ import java.util.stream.Collectors;
 @Service
 public class DashboardService {
 
-    // Spring auto-injects both repositories — we never call "new"
+    // Spring auto-injects all three repositories — we never call "new"
     @Autowired
     private DeliveryRequestRepository deliveryRequestRepository;
 
     @Autowired
     private AgentRepository agentRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TrackingEventRepository trackingEventRepository;
 
     // =========================================================================
     // ADMIN DASHBOARD — order feed methods
@@ -183,7 +196,7 @@ public class DashboardService {
      * @param agentId    ID of the agent to filter by — null means all agents
      * @return           filtered list of orders matching all provided criteria
      */
-    public List<DeliveryRequest> filterOrders(String status, Boolean isImmediate, Long agentId) {
+    public List<DeliveryRequest> filterOrders(String status, Boolean isImmediate, Long agentId, String zone) {
         return deliveryRequestRepository.findAll()
                 .stream()
                 // Filter by status if one was provided
@@ -197,6 +210,14 @@ public class DashboardService {
                 .filter(order -> agentId == null
                         || (order.getAgent() != null
                             && order.getAgent().getId().equals(agentId)))
+                // Filter by zone if one was provided.
+                // Zone is stored on the Agent entity, so we check:
+                //   1. Agent is not null (order has been assigned)
+                //   2. Agent has a zone set
+                //   3. That zone matches the requested zone
+                .filter(order -> zone == null || zone.isEmpty()
+                        || (order.getAgent() != null
+                            && zone.equals(order.getAgent().getZone())))
                 .collect(Collectors.toList());
     }
 
@@ -212,10 +233,37 @@ public class DashboardService {
      * This is the "Right Now" section of the agent dashboard.
      */
     public List<DeliveryRequest> getAgentCurrentOrders(Agent agent) {
+        LocalDate today = LocalDate.now();
+        LocalTime now   = LocalTime.now();
+
         return deliveryRequestRepository.findByAgent(agent)
                 .stream()
-                .filter(order -> order.getStatus() == DeliveryStatusEnum.ASSIGNED
-                        || order.getStatus() == DeliveryStatusEnum.OUT_FOR_DELIVERY)
+                .filter(order -> {
+
+                    // --- Case 1: Immediate order being actively handled ---
+                    // ASSIGNED means the agent has been told to go pick it up.
+                    // OUT_FOR_DELIVERY means they are already on the way to the customer.
+                    if (order.isImmediate()) {
+                        return order.getStatus() == DeliveryStatusEnum.ASSIGNED
+                                || order.getStatus() == DeliveryStatusEnum.OUT_FOR_DELIVERY;
+                    }
+
+                    // --- Case 2: Scheduled order whose time window is happening right now ---
+                    // We check three things:
+                    //   1. The order isn't already delivered/failed (not a terminal state)
+                    //   2. The slot is for TODAY's date
+                    //   3. The current clock time is inside the slot window (e.g. 11:00–13:00)
+                    // If all three are true, this order belongs in "Right Now".
+                    com.bt.deliveryapp.model.TimeSlot slot = order.getTimeSlot();
+                    if (slot != null && !isTerminalStatus(order.getStatus())) {
+                        boolean isToday        = today.equals(slot.getSlotDate());
+                        boolean isWithinWindow = !now.isBefore(slot.getStartTime())
+                                              && !now.isAfter(slot.getEndTime());
+                        return isToday && isWithinWindow;
+                    }
+
+                    return false;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -227,10 +275,25 @@ public class DashboardService {
      * Sorted chronologically so the next delivery appears at the top.
      */
     public List<DeliveryRequest> getAgentScheduledOrders(Agent agent) {
+        LocalDate today = LocalDate.now();
+        LocalTime now   = LocalTime.now();
+
         return deliveryRequestRepository.findByAgent(agent)
                 .stream()
+                // Only non-immediate, non-terminal orders
                 .filter(order -> !order.isImmediate()
-                        && order.getStatus() == DeliveryStatusEnum.SCHEDULED)
+                        && !isTerminalStatus(order.getStatus()))
+                // Exclude orders currently showing in "Right Now" (slot is active right now)
+                // so the same order never appears in both sections simultaneously.
+                .filter(order -> {
+                    com.bt.deliveryapp.model.TimeSlot slot = order.getTimeSlot();
+                    if (slot == null) return true;   // no slot — keep in Upcoming
+                    boolean isToday        = today.equals(slot.getSlotDate());
+                    boolean isWithinWindow = !now.isBefore(slot.getStartTime())
+                                          && !now.isAfter(slot.getEndTime());
+                    // If the slot is active right now, it's in "Right Now" — exclude it here
+                    return !(isToday && isWithinWindow);
+                })
                 .sorted(Comparator.comparing(order ->
                         order.getTimeSlot() != null
                                 ? order.getTimeSlot().getSlotDate()
@@ -286,6 +349,151 @@ public class DashboardService {
 
         // Persist the updated order
         deliveryRequestRepository.save(order);
+    }
+
+    // =========================================================================
+    // ADMIN DASHBOARD — create a new delivery agent
+    // =========================================================================
+
+    /**
+     * Creates a new delivery agent account.
+     *
+     * This does TWO things in one go:
+     *   1. Creates a User account (the login credentials — name, email, password, phone)
+     *      with role set to AGENT
+     *   2. Creates an Agent profile (the operational data — availability, zone)
+     *      linked to that User via @OneToOne
+     *
+     * --- Why @Transactional? ---
+     * We are saving TWO things: a User and an Agent. If one save succeeds but
+     * the other fails, we would have a User without an Agent profile — broken data.
+     * @Transactional makes it all-or-nothing: either BOTH are saved, or NEITHER.
+     *
+     * --- Why check for duplicate email? ---
+     * Email is marked unique = true in the User table. If we try to save a duplicate,
+     * MySQL would throw an ugly SQL error. Checking first gives a clean message.
+     *
+     * @param name     the agent's full name
+     * @param email    their login email (must be unique)
+     * @param password their login password
+     * @param phone    their phone number
+     * @param zone     which area they operate in (e.g. "NORTH", "SOUTH")
+     * @return the created Agent object (with its User linked)
+     * @throws IllegalArgumentException if the email is already taken or inputs are invalid
+     */
+    @Transactional
+    public Agent createAgent(String name, String email, String password,
+                             String phone, String zone) {
+
+        // --- Validate inputs ---
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Agent name cannot be empty.");
+        }
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email cannot be empty.");
+        }
+        if (password == null || password.trim().isEmpty()) {
+            throw new IllegalArgumentException("Password cannot be empty.");
+        }
+
+        // --- Check for duplicate email ---
+        if (userRepository.existsByEmail(email.trim())) {
+            throw new IllegalArgumentException("An account with email '" + email + "' already exists.");
+        }
+
+        // --- Step 1: Create the User account with AGENT role ---
+        User agentUser = new User(
+                name.trim(),
+                email.trim(),
+                password,          // In a real app, this would be encrypted with BCrypt
+                phone != null ? phone.trim() : null,
+                UserRole.AGENT     // This user is a delivery agent
+        );
+        userRepository.save(agentUser);
+
+        // --- Step 2: Create the Agent profile linked to this User ---
+        Agent agent = new Agent(agentUser);     // Constructor sets available=true, count=0
+        if (zone != null && !zone.trim().isEmpty()) {
+            agent.setZone(zone.trim().toUpperCase());
+        }
+        agentRepository.save(agent);
+
+        return agent;
+    }
+
+    // =========================================================================
+    // ADMIN DASHBOARD — delete a delivery agent
+    // =========================================================================
+
+    /**
+     * Deletes a delivery agent from the system.
+     *
+     * This is more involved than a simple delete because:
+     *   1. We must NOT delete agents who have active orders — that would leave
+     *      deliveries with no one responsible for them.
+     *   2. Completed orders (DELIVERED / FAILED) still reference this agent in
+     *      the delivery_requests table. Before deleting the Agent row, we must
+     *      set those references to null — otherwise the database will refuse
+     *      to delete (it protects referential integrity).
+     *   3. We delete TWO rows: the Agent profile AND the linked User account.
+     *      @Transactional ensures both succeed, or neither does.
+     *
+     * --- What is referential integrity? ---
+     * The delivery_requests table has a column agent_id that points at the
+     * agents table. The database enforces that you cannot delete an agent row
+     * while other rows still point to it — like removing a contact from your
+     * phone book while messages still reference their name. We "unlink" first.
+     *
+     * @param agentId  the database ID of the Agent profile to delete
+     * @throws IllegalArgumentException if the agent doesn't exist or has active orders
+     */
+    @Transactional
+    public void deleteAgent(Long agentId) {
+
+        // Step 1: Find the agent — fail clearly if they don't exist
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Agent #" + agentId + " not found."));
+
+        // Step 2: Check for active orders — block deletion if any exist
+        // An "active" order is one that is not yet DELIVERED or FAILED.
+        // If an agent has active orders, we refuse — the admin must reassign first.
+        List<DeliveryRequest> agentOrders = deliveryRequestRepository.findByAgent(agent);
+        boolean hasActiveOrders = agentOrders.stream()
+                .anyMatch(order -> !isTerminalStatus(order.getStatus()));
+
+        if (hasActiveOrders) {
+            throw new IllegalArgumentException(
+                "Cannot delete agent '" + agent.getUser().getName() + "' — "
+                + "they have active orders. Please reassign or complete their "
+                + "orders first before deleting this agent.");
+        }
+
+        // Step 3: Unlink the agent from completed (terminal) orders
+        // These are DELIVERED or FAILED orders — history records.
+        // We set agent = null on each so the DB FK constraint doesn't block deletion.
+        for (DeliveryRequest order : agentOrders) {
+            order.setAgent(null);
+            deliveryRequestRepository.save(order);
+        }
+
+        // Step 4: Unlink tracking events that reference this user.
+        // The tracking_events table has a column "updated_by_user_id" pointing to users.
+        // If the agent ever updated a delivery status, those tracking events still reference
+        // their User ID. We must set updatedBy = null BEFORE deleting the user, or the
+        // database will block the deletion with a foreign key constraint error.
+        // The tracking history is preserved — we just remove "who" made the update.
+        User user = agent.getUser();
+        List<TrackingEvent> userTrackingEvents = trackingEventRepository.findByUpdatedBy(user);
+        for (TrackingEvent event : userTrackingEvents) {
+            event.setUpdatedBy(null);
+            trackingEventRepository.save(event);
+        }
+
+        // Step 5: Delete the Agent profile first, then the User account.
+        // Order matters: Agent holds the foreign key to User, so Agent must go first.
+        agentRepository.delete(agent);
+        userRepository.delete(user);
     }
 
     // =========================================================================

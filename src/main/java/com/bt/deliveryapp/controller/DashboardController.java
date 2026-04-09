@@ -7,6 +7,7 @@ import com.bt.deliveryapp.model.DeliveryRequest;
 import com.bt.deliveryapp.model.User;
 import com.bt.deliveryapp.repository.AgentRepository;
 import com.bt.deliveryapp.service.DashboardService;
+import com.bt.deliveryapp.service.RouteOptimisationService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -47,12 +48,15 @@ import java.util.Optional;
 @Controller
 public class DashboardController {
 
-    // Spring auto-injects both beans — we never call "new"
+    // Spring auto-injects all beans — we never call "new"
     @Autowired
     private DashboardService dashboardService;
 
     @Autowired
     private AgentRepository agentRepository;
+
+    @Autowired
+    private RouteOptimisationService routeOptimisationService;
 
     // =========================================================================
     // GET /admin/dashboard — Admin view
@@ -86,6 +90,7 @@ public class DashboardController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Boolean isImmediate,
             @RequestParam(required = false) Long agentId,
+            @RequestParam(required = false) String zone,
             HttpSession session,
             Model model) {
 
@@ -106,7 +111,8 @@ public class DashboardController {
         // Otherwise, use the clean default methods (getLiveOrders / getScheduledOrders).
         boolean filterApplied = (status != null && !status.isEmpty())
                 || isImmediate != null
-                || agentId != null;
+                || agentId != null
+                || (zone != null && !zone.isEmpty());
 
         List<DeliveryRequest> liveOrders;
         List<DeliveryRequest> scheduledOrders;
@@ -114,7 +120,7 @@ public class DashboardController {
         if (filterApplied) {
             // Filter was applied — run the combined filter, then split by type
             // so each panel still shows only its own order type
-            List<DeliveryRequest> filtered = dashboardService.filterOrders(status, isImmediate, agentId);
+            List<DeliveryRequest> filtered = dashboardService.filterOrders(status, isImmediate, agentId, zone);
             liveOrders = filtered.stream()
                     .filter(DeliveryRequest::isImmediate)
                     .collect(java.util.stream.Collectors.toList());
@@ -149,6 +155,7 @@ public class DashboardController {
         model.addAttribute("filterStatus", status);
         model.addAttribute("filterIsImmediate", isImmediate);
         model.addAttribute("filterAgentId", agentId);
+        model.addAttribute("filterZone", zone);
         model.addAttribute("filterApplied", filterApplied);
 
         return "admin-dashboard"; // → loads src/main/resources/templates/admin-dashboard.html
@@ -205,6 +212,155 @@ public class DashboardController {
 
         // Always redirect back to the admin dashboard (POST-Redirect-GET)
         return "redirect:/admin/dashboard";
+    }
+
+    // =========================================================================
+    // POST /admin/create-agent — Admin creates a new delivery agent
+    // =========================================================================
+
+    /**
+     * Handles: POST /admin/create-agent (form submission from the admin dashboard)
+     *
+     * The admin fills in the "Create Agent" form with: name, email, password, phone, zone.
+     * This method asks the DashboardService to:
+     *   1. Create a User account with role AGENT
+     *   2. Create an Agent profile linked to that User
+     *
+     * --- Why are the fields @RequestParam? ---
+     * The form sends the data as URL-encoded form fields (the standard way HTML forms work).
+     * @RequestParam tells Spring to pull each field from the submitted form data.
+     *
+     * --- POST-Redirect-GET ---
+     * After creating the agent, we redirect back to /admin/dashboard instead of
+     * rendering a page directly. This prevents the form from being re-submitted
+     * if the admin refreshes their browser.
+     *
+     * @param name               the agent's full name (required)
+     * @param email              their login email (required, must be unique)
+     * @param password           their login password (required)
+     * @param phone              their phone number (optional)
+     * @param zone               their delivery zone (optional, e.g. "NORTH")
+     * @param session            HTTP session — confirms admin is logged in
+     * @param redirectAttributes for passing flash messages across the redirect
+     * @return redirect back to the admin dashboard
+     */
+    @PostMapping("/admin/create-agent")
+    public String createAgent(
+            @RequestParam("agentName")     String name,
+            @RequestParam("agentEmail")    String email,
+            @RequestParam("agentPassword") String password,
+            @RequestParam(value = "agentPhone", required = false) String phone,
+            @RequestParam(value = "agentZone",  required = false) String zone,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+
+        // --- Check login and role ---
+        User loggedInUser = (User) session.getAttribute("loggedInUser");
+        if (loggedInUser == null || loggedInUser.getRole() != UserRole.ADMIN) {
+            return "redirect:/login";
+        }
+
+        try {
+            // Ask the service to create the User + Agent pair
+            Agent newAgent = dashboardService.createAgent(name, email, password, phone, zone);
+
+            // Success! Show a confirmation message with the agent's name
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "Agent '" + newAgent.getUser().getName() + "' has been created successfully! "
+                    + "They can now log in with: " + email);
+
+        } catch (IllegalArgumentException e) {
+            // Validation error (empty field, duplicate email, etc.)
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        } catch (Exception e) {
+            // Unexpected error — show details for debugging
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Could not create agent: " + e.getMessage());
+        }
+
+        // Redirect to the Agents page (not the main dashboard)
+        return "redirect:/admin/agents";
+    }
+
+    // =========================================================================
+    // GET /admin/agents — Dedicated Agents management page
+    // =========================================================================
+
+    /**
+     * Handles: GET /admin/agents
+     *
+     * Shows a dedicated page listing all delivery agents in the system,
+     * with their details (name, email, zone, availability, active deliveries).
+     * Also contains the "Create Agent" form and a "Delete" button per agent.
+     *
+     * @param session  HTTP session — confirms admin is logged in
+     * @param model    the container we use to send data to the HTML template
+     * @return         the name of the Thymeleaf template to render
+     */
+    @GetMapping("/admin/agents")
+    public String showAgentsPage(HttpSession session, Model model) {
+
+        // --- Check login and role ---
+        User loggedInUser = (User) session.getAttribute("loggedInUser");
+        if (loggedInUser == null || loggedInUser.getRole() != UserRole.ADMIN) {
+            return "redirect:/login";
+        }
+
+        model.addAttribute("loggedInUser", loggedInUser);
+
+        // Pass all agents to the page for display in the table
+        model.addAttribute("allAgents", dashboardService.getAllAgents());
+
+        return "admin-agents"; // → loads src/main/resources/templates/admin-agents.html
+    }
+
+    // =========================================================================
+    // POST /admin/delete-agent/{agentId} — Delete a delivery agent
+    // =========================================================================
+
+    /**
+     * Handles: POST /admin/delete-agent/{agentId}
+     *
+     * Deletes the agent profile and their linked User account.
+     * The service will reject deletion if the agent has active orders.
+     *
+     * Why POST and not DELETE?
+     * HTML forms only support GET and POST — they can't send a DELETE request.
+     * Using POST with a path variable is the standard workaround in web apps.
+     *
+     * --- POST-Redirect-GET ---
+     * After deletion, we redirect back to /admin/agents with a flash message.
+     *
+     * @param agentId             the ID of the agent to delete (from URL path)
+     * @param session             HTTP session — confirms admin is logged in
+     * @param redirectAttributes  for passing flash messages across the redirect
+     * @return redirect back to the agents page
+     */
+    @PostMapping("/admin/delete-agent/{agentId}")
+    public String deleteAgent(@PathVariable Long agentId,
+                              HttpSession session,
+                              RedirectAttributes redirectAttributes) {
+
+        // --- Check login and role ---
+        User loggedInUser = (User) session.getAttribute("loggedInUser");
+        if (loggedInUser == null || loggedInUser.getRole() != UserRole.ADMIN) {
+            return "redirect:/login";
+        }
+
+        try {
+            dashboardService.deleteAgent(agentId);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "Agent has been deleted successfully.");
+
+        } catch (IllegalArgumentException e) {
+            // Agent has active orders, or not found
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Could not delete agent: " + e.getMessage());
+        }
+
+        return "redirect:/admin/agents";
     }
 
     // =========================================================================
@@ -272,5 +428,57 @@ public class DashboardController {
         model.addAttribute("scheduledOrders", scheduledOrders);
 
         return "agent-dashboard"; // → loads src/main/resources/templates/agent-dashboard.html
+    }
+
+    // =========================================================================
+    // POST /admin/run-auto-assign — Bulk auto-assign unassigned orders
+    // =========================================================================
+
+    /**
+     * Handles: POST /admin/run-auto-assign
+     *
+     * Triggered by the "Run Auto-Assign" button on the admin dashboard.
+     * Finds every order that currently has no agent assigned (in PLACED or
+     * SCHEDULED status) and uses RouteOptimisationService to assign the best
+     * available agent to each one.
+     *
+     * --- Why is this useful? ---
+     * Auto-assign normally runs at booking time. But orders placed before
+     * auto-assign was set up (or orders that were skipped because no agents
+     * were available at that moment) stay unassigned. This button is a
+     * manual "catch-up" that processes all of them in one click.
+     *
+     * --- POST-Redirect-GET pattern ---
+     * After running, we redirect back to /admin/dashboard with a flash message
+     * telling the admin how many orders were assigned.
+     */
+    @PostMapping("/admin/run-auto-assign")
+    public String runAutoAssign(HttpSession session, RedirectAttributes redirectAttributes) {
+
+        // --- Check login and role ---
+        User loggedInUser = (User) session.getAttribute("loggedInUser");
+        if (loggedInUser == null || loggedInUser.getRole() != UserRole.ADMIN) {
+            return "redirect:/login";
+        }
+
+        try {
+            // Run the bulk assignment — returns how many orders were assigned
+            int count = routeOptimisationService.runAutoAssignAll();
+
+            if (count == 0) {
+                // No orders were assigned — either all already assigned, or no agents available
+                redirectAttributes.addFlashAttribute("successMessage",
+                        "Auto-assign ran successfully — no unassigned orders found, or no agents are available.");
+            } else {
+                redirectAttributes.addFlashAttribute("successMessage",
+                        "✅ Auto-assign complete! " + count + " order" + (count == 1 ? "" : "s") + " assigned.");
+            }
+
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Auto-assign failed: " + e.getMessage());
+        }
+
+        return "redirect:/admin/dashboard";
     }
 }

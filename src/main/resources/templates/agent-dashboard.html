@@ -60,8 +60,12 @@
           <div>
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.375rem;">
               <span class="order-id" th:text="'#' + ${order.id}">#ID</span>
-              <span class="diq-badge diq-badge-immediate">
+              <!-- Show Immediate or Scheduled badge based on the actual order type -->
+              <span th:if="${order.immediate}" class="diq-badge diq-badge-immediate">
                 <i class="bi bi-lightning-charge-fill"></i> Immediate
+              </span>
+              <span th:unless="${order.immediate}" class="diq-badge diq-badge-scheduled">
+                <i class="bi bi-calendar-check"></i> Scheduled
               </span>
             </div>
             <span class="diq-badge"
@@ -71,6 +75,13 @@
           <span class="diq-badge"
                 th:classappend="'diq-badge-priority-' + ${order.priority.name()}"
                 th:text="${order.priority.name()}">PRIORITY</span>
+        </div>
+
+        <!-- Time slot (only shown for scheduled orders appearing in Right Now) -->
+        <div th:if="${!order.immediate and order.timeSlot != null}"
+             style="display:flex;align-items:center;gap:0.5rem;background:#F0FDF4;border:1px solid rgba(22,163,74,.2);border-radius:8px;padding:0.5rem 0.75rem;margin-bottom:0.75rem;font-size:0.8125rem;color:#15803D;">
+          <i class="bi bi-clock"></i>
+          <span th:text="${#temporals.format(order.timeSlot.date,'dd MMM')} + ' · ' + ${order.timeSlot.startTime} + ' – ' + ${order.timeSlot.endTime}">Slot</span>
         </div>
 
         <!-- Route -->
@@ -129,7 +140,7 @@
   <section>
     <div class="diq-section-header">
       <div class="section-icon" style="background:#F0FDF4;color:#16A34A;"><i class="bi bi-calendar-check"></i></div>
-      <h2>Today's Schedule</h2>
+      <h2>Upcoming Schedule</h2>
       <span class="count-pill" style="background:#F0FDF4;color:#166534;" th:text="${#lists.size(scheduledOrders)}">0</span>
     </div>
 
@@ -139,7 +150,7 @@
       <div class="diq-empty">
         <div class="empty-icon"><i class="bi bi-calendar3"></i></div>
         <p class="empty-title">Nothing scheduled yet</p>
-        <p class="empty-desc">Your upcoming scheduled deliveries will appear here.</p>
+        <p class="empty-desc">Your scheduled deliveries will appear here once orders are assigned to you.</p>
       </div>
     </div>
 
