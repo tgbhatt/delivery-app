@@ -50,6 +50,13 @@ public class Agent {
     @Column(nullable = false)
     private int currentDeliveryCount;
 
+    // ---- Which zone does this agent operate in? ----
+    // e.g. "NORTH", "SOUTH", "CENTRAL", "EAST", "WEST"
+    // Used by RouteOptimisationService to match agents to nearby orders.
+    // Nullable — zone might not be assigned yet.
+    @Column(length = 50)
+    private String zone;
+
     // ---- When did this agent last update a delivery status? ----
     // Useful for the admin dashboard to spot idle agents
     private LocalDateTime lastActiveAt;
@@ -97,6 +104,14 @@ public class Agent {
 
     public void setCurrentDeliveryCount(int currentDeliveryCount) {
         this.currentDeliveryCount = currentDeliveryCount;
+    }
+
+    public String getZone() {
+        return zone;
+    }
+
+    public void setZone(String zone) {
+        this.zone = zone;
     }
 
     public LocalDateTime getLastActiveAt() {

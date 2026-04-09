@@ -24,4 +24,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Find all users with a specific role — used by admin dashboard
     List<User> findByRole(UserRole role);
+
+    // Check if a user with the given email already exists — used by RegisterService
+    // Spring auto-generates: SELECT COUNT(*) > 0 FROM users WHERE email = ?
+    // Returns true if the email is already taken, false otherwise
+    boolean existsByEmail(String email);
 }
