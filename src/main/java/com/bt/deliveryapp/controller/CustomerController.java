@@ -201,6 +201,7 @@ public class CustomerController {
     @PostMapping("/customer/book")
     public String placeOrder(
             @RequestParam("pickupAddress")      String pickupAddress,
+            @RequestParam("pickupZone")         String pickupZone,
             @RequestParam("deliveryAddress")    String deliveryAddress,
             @RequestParam("packageDescription") String packageDescription,
             @RequestParam("priority")           String priorityStr,
@@ -236,6 +237,7 @@ public class CustomerController {
                 deliveryBookingService.placeImmediateOrder(
                         loggedInUser,
                         pickupAddress,      // maps to restaurantAddress in the model
+                        pickupZone,         // the zone the customer selected in the form
                         deliveryAddress,    // maps to customerAddress in the model
                         packageDescription  // maps to orderDescription in the model
                 );
@@ -253,6 +255,7 @@ public class CustomerController {
                 deliveryBookingService.placeScheduledOrder(
                         loggedInUser,
                         pickupAddress,
+                        pickupZone,
                         deliveryAddress,
                         packageDescription,
                         timeSlotId
@@ -274,9 +277,13 @@ public class CustomerController {
             return "redirect:/customer/book";
 
         } catch (Exception e) {
-            // Catch-all for unexpected errors — always show something helpful
+            // Catch-all for unexpected errors — now shows the actual error detail
+            // so we (the developers) can see what went wrong and fix it.
+            // e.getMessage() gives us the technical reason for the failure.
+            // In a production app you would log this instead of showing it to the user,
+            // but during development, seeing the actual error saves a LOT of debugging time.
             redirectAttributes.addFlashAttribute("errorMessage",
-                    "An unexpected error occurred. Please try again.");
+                    "An unexpected error occurred: " + e.getMessage());
             return "redirect:/customer/book";
         }
     }

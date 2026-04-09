@@ -74,6 +74,18 @@
             </div>
 
             <div class="diq-form-group">
+              <label for="pickupZone" class="diq-label">Pickup zone <span class="required">*</span></label>
+              <select id="pickupZone" name="pickupZone" class="diq-select" required>
+                <option value="">Which area is the pickup in?</option>
+                <option value="NORTH">North</option>
+                <option value="SOUTH">South</option>
+                <option value="EAST">East</option>
+                <option value="WEST">West</option>
+                <option value="CENTRAL">Central</option>
+              </select>
+            </div>
+
+            <div class="diq-form-group">
               <label for="deliveryAddress" class="diq-label">Delivery address <span class="required">*</span></label>
               <div class="diq-input-wrap">
                 <i class="bi bi-geo-alt-fill input-icon" style="color:#16A34A;"></i>
@@ -88,7 +100,7 @@
 
           <div style="display:flex;justify-content:flex-end;margin-top:1.75rem;">
             <button type="button" class="diq-btn diq-btn-primary"
-                    onclick="diqStepNextValidate(['pickupAddress','deliveryAddress'])">
+                    onclick="diqStepNextValidate(['pickupAddress','pickupZone','deliveryAddress'])">
               Next <i class="bi bi-arrow-right"></i>
             </button>
           </div>

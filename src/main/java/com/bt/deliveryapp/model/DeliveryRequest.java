@@ -64,7 +64,9 @@ public class DeliveryRequest {
     // ---- Is this an immediate order or a scheduled one? ----
     // true  = Order Now  → skip slot scheduling, go straight into the queue
     // false = Schedule for Later → run through the slot scheduling algorithm
-    @Column(nullable = false)
+    // We explicitly name the column "is_immediate" to prevent Hibernate
+    // from creating a duplicate column with a different name.
+    @Column(name = "is_immediate", nullable = false)
     private boolean isImmediate;
 
     // ---- Which time slot was assigned? ----
@@ -90,6 +92,12 @@ public class DeliveryRequest {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    // ---- Which zone is the pickup location in? ----
+    // Used by RouteOptimisationService to assign a nearby delivery agent
+    // e.g. "NORTH", "SOUTH", "CENTRAL" — nullable because zone may not always be known
+    @Column(length = 50)
+    private String pickupZone;
 
     // ---- Any special delivery instructions? ----
     // e.g. "Leave at door", "Call on arrival", "No contactless"
@@ -230,6 +238,14 @@ public class DeliveryRequest {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getPickupZone() {
+        return pickupZone;
+    }
+
+    public void setPickupZone(String pickupZone) {
+        this.pickupZone = pickupZone;
     }
 
     public String getSpecialInstructions() {

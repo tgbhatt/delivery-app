@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * RouteOptimisationService — Feature 3: Smart Agent Assignment.
@@ -127,10 +128,14 @@ public class RouteOptimisationService {
      * @return list of agents (all available agents on this branch)
      */
     public List<Agent> getAgentsInZone(String zone) {
-        // Without a zone field on Agent, we return all available agents.
-        // This means zone preference degrades gracefully to "first available agent",
-        // which is still better than breaking the whole feature.
-        return agentRepository.findByAvailableTrue();
+        // Filter available agents to only those whose zone matches the requested zone.
+        // zone.equalsIgnoreCase() handles case differences (e.g. "central" vs "CENTRAL").
+        // If an agent has no zone set (null), they are skipped — only matched agents appear.
+        // The fallback in suggestBestAgent() handles the case where no zone-matched agent is found.
+        return agentRepository.findByAvailableTrue()
+                .stream()
+                .filter(agent -> zone.equalsIgnoreCase(agent.getZone()))
+                .collect(Collectors.toList());
     }
 
     // =========================================================================
@@ -378,15 +383,102 @@ public class RouteOptimisationService {
      * @return the first agent with capacity, or null if all are full
      */
     private Agent findAgentUnderCap(List<Agent> agents, int maxOrdersPerAgent) {
+        // Instead of picking the FIRST agent under the cap (which always assigns
+        // the same person), we pick the LEAST LOADED agent — the one with the
+        // fewest active orders. This spreads deliveries evenly across all agents.
+        //
+        // Example: Agent A has 2 orders, Agent B has 0, Agent C has 1.
+        // Old logic → always Agent A (first in list, under cap of 3).
+        // New logic → Agent B (fewest orders = 0), then C (1), then A (2).
+
+        Agent leastLoaded = null;
+        long leastCount   = Long.MAX_VALUE;   // start with a very high number
+
         for (Agent agent : agents) {
             long activeCount = deliveryRequestRepository
                     .countByAgentAndStatus(agent, DeliveryStatusEnum.ASSIGNED);
 
-            if (activeCount < maxOrdersPerAgent) {
-                return agent;
+            // Only consider agents who are still under the workload cap
+            // AND who have fewer orders than the current best candidate
+            if (activeCount < maxOrdersPerAgent && activeCount < leastCount) {
+                leastLoaded = agent;
+                leastCount  = activeCount;
             }
         }
-        return null;
+
+        return leastLoaded;  // null if every agent is at or above the cap
+    }
+
+    // =========================================================================
+    // BULK AUTO-ASSIGN: covers ALL unassigned orders regardless of status
+    // Used by the "Run Auto-Assign" button on the admin dashboard to catch
+    // any orders that were placed before auto-assignment was fully wired up.
+    // =========================================================================
+
+    /**
+     * Assigns agents to every order that currently has no agent,
+     * regardless of whether the order is PLACED or SCHEDULED.
+     *
+     * --- Why is this different from runAutoAssignment()? ---
+     * runAutoAssignment() only looks at SCHEDULED orders. But immediate orders
+     * start with PLACED status — they would never be picked up by that method.
+     * This method uses stream().filter() to find ALL agent-less orders and
+     * runs the same greedy assignment algorithm on each of them.
+     *
+     * --- What does "greedy" mean here? ---
+     * At each step we just pick the first available agent under the workload cap.
+     * It is "greedy" because it makes the locally best choice right now without
+     * looking ahead. It is simple, fast, and good enough for our use case.
+     *
+     * @return how many orders were successfully assigned in this run
+     */
+    @Transactional
+    public int runAutoAssignAll() {
+
+        // Fetch every order in the system and filter to the ones with no agent
+        // and a status that makes sense to assign (PLACED or SCHEDULED).
+        // ASSIGNED/OUT_FOR_DELIVERY/DELIVERED/FAILED orders are skipped.
+        List<DeliveryRequest> unassigned = deliveryRequestRepository.findAll()
+                .stream()
+                .filter(o -> o.getAgent() == null)
+                .filter(o -> o.getStatus() == DeliveryStatusEnum.PLACED
+                          || o.getStatus() == DeliveryStatusEnum.SCHEDULED)
+                .collect(Collectors.toList());
+
+        List<Agent> allAgents = getAllAgents();
+        int assignedCount = 0;
+
+        for (DeliveryRequest order : unassigned) {
+
+            // First try zone-matched agent; fall back to any agent under cap
+            String zone = order.getPickupZone();
+            Agent chosen = null;
+
+            if (zone != null && !zone.isBlank()) {
+                List<Agent> zoneAgents = getAgentsInZone(zone);
+                chosen = findAgentUnderCap(zoneAgents, 3);
+            }
+
+            if (chosen == null) {
+                chosen = findAgentUnderCap(allAgents, 3);
+            }
+
+            if (chosen == null) {
+                continue;  // all agents at capacity — skip this order
+            }
+
+            order.setAgent(chosen);
+            // Only advance to ASSIGNED for immediate orders.
+            // Scheduled orders keep SCHEDULED status — they have a future time slot
+            // and shouldn't appear as "active right now" on the agent dashboard.
+            if (order.isImmediate()) {
+                order.setStatus(DeliveryStatusEnum.ASSIGNED);
+            }
+            deliveryRequestRepository.save(order);
+            assignedCount++;
+        }
+
+        return assignedCount;
     }
 
     // =========================================================================
