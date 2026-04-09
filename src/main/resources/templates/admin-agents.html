@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head(title='Manage Agents')}">
+</head>
+<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="diq-container">
+
+  <!-- Flash messages -->
+  <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
+
+  <!-- ── Page Header ──────────────────────────────────────── -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;">
+    <div>
+      <p class="diq-label" style="margin-bottom:0.25rem;">Admin</p>
+      <h1 style="font-size:1.625rem;font-weight:700;letter-spacing:-0.02em;margin:0;">
+        Delivery Agents
+      </h1>
+    </div>
+    <!-- Back to dashboard link -->
+    <a th:href="@{/admin/dashboard}" class="diq-btn diq-btn-secondary diq-btn-sm">
+      <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+  </div>
+
+  <!-- ── Agents Table ──────────────────────────────────────── -->
+  <div class="diq-card" style="margin-bottom:2rem;">
+
+    <div class="diq-card-header">
+      <div style="display:flex;align-items:center;gap:0.625rem;">
+        <div style="width:28px;height:28px;border-radius:7px;background:#EFF6FF;color:#2563EB;
+                    display:flex;align-items:center;justify-content:center;font-size:0.875rem;">
+          <i class="bi bi-people-fill"></i>
+        </div>
+        <span style="font-size:0.9375rem;font-weight:700;color:#1D1D1F;">All Agents</span>
+      </div>
+      <span class="diq-badge diq-badge-ASSIGNED"
+            th:text="${#lists.size(allAgents)} + ' agent' + (${#lists.size(allAgents)} == 1 ? '' : 's')">
+        N agents
+      </span>
+    </div>
+
+    <!-- Empty state — shown when no agents exist yet -->
+    <div th:if="${allAgents == null or allAgents.isEmpty()}" class="diq-empty">
+      <div class="empty-icon"><i class="bi bi-person-x"></i></div>
+      <p class="empty-title">No agents yet</p>
+      <p class="empty-desc">Use the form below to create your first delivery agent.</p>
+    </div>
+
+    <!-- Table — shown when at least one agent exists -->
+    <div th:unless="${allAgents == null or allAgents.isEmpty()}"
+         class="diq-table-wrap" style="border:none;border-radius:0;">
+      <table class="diq-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Zone</th>
+            <th>Status</th>
+            <th>Active Deliveries</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="agent : ${allAgents}">
+
+            <!-- Name + avatar initial -->
+            <td>
+              <div style="display:flex;align-items:center;gap:0.625rem;">
+                <div style="width:32px;height:32px;border-radius:50%;background:#EFF6FF;
+                            color:#2563EB;display:flex;align-items:center;justify-content:center;
+                            font-size:0.8125rem;font-weight:700;flex-shrink:0;"
+                     th:text="${#strings.toUpperCase(#strings.substring(agent.user.name,0,1))}">
+                  A
+                </div>
+                <span style="font-weight:600;font-size:0.875rem;color:#1D1D1F;"
+                      th:text="${agent.user.name}">Agent Name</span>
+              </div>
+            </td>
+
+            <!-- Email -->
+            <td style="font-size:0.8125rem;color:#6E6E73;" th:text="${agent.user.email}">
+              email@example.com
+            </td>
+
+            <!-- Phone — show a dash if no phone was set -->
+            <td style="font-size:0.8125rem;color:#6E6E73;">
+              <span th:if="${agent.user.phone != null and !agent.user.phone.isEmpty()}"
+                    th:text="${agent.user.phone}">Phone</span>
+              <span th:if="${agent.user.phone == null or agent.user.phone.isEmpty()}"
+                    style="color:#C7C7CC;">—</span>
+            </td>
+
+            <!-- Zone badge — show "No zone" in grey if not set -->
+            <td>
+              <span th:if="${agent.zone != null and !agent.zone.isEmpty()}"
+                    class="diq-badge"
+                    style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;"
+                    th:text="${agent.zone}">ZONE</span>
+              <span th:if="${agent.zone == null or agent.zone.isEmpty()}"
+                    class="diq-badge"
+                    style="background:#F5F5F7;color:#8E8E93;border:1px solid #E5E5EA;">
+                No zone
+              </span>
+            </td>
+
+            <!-- Available / Off duty badge -->
+            <td>
+              <span th:if="${agent.available}"
+                    class="diq-badge diq-badge-DELIVERED"
+                    style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;">
+                <i class="bi bi-circle-fill" style="font-size:0.5rem;vertical-align:middle;margin-right:3px;"></i>
+                Available
+              </span>
+              <span th:unless="${agent.available}"
+                    class="diq-badge diq-badge-FAILED"
+                    style="background:#FFF7ED;color:#C2410C;border:1px solid #FED7AA;">
+                <i class="bi bi-circle-fill" style="font-size:0.5rem;vertical-align:middle;margin-right:3px;"></i>
+                Off duty
+              </span>
+            </td>
+
+            <!-- Active delivery count -->
+            <td style="text-align:center;">
+              <span style="font-size:0.875rem;font-weight:600;color:#1D1D1F;"
+                    th:text="${agent.currentDeliveryCount}">0</span>
+            </td>
+
+            <!-- Delete button — submits a form via POST -->
+            <!--
+              Why a form instead of a plain link?
+              Deleting data must use POST, not GET. A plain <a href> always sends GET.
+              Wrapping in a form lets us send POST with the agent ID to /admin/delete-agent/{id}.
+              The onclick confirm() pops up "Are you sure?" before submitting.
+            -->
+            <td>
+              <form th:action="@{'/admin/delete-agent/' + ${agent.id}}"
+                    method="post" style="margin:0;">
+                <button type="submit"
+                        class="diq-btn diq-btn-sm"
+                        style="background:#FFF1F2;color:#BE123C;border:1px solid #FECDD3;
+                               padding:0.3rem 0.75rem;font-size:0.8rem;"
+                        th:attr="data-name=${agent.user.name}"
+                        onclick="return confirm('Delete agent ' + this.dataset.name + '? This cannot be undone.')">
+                  <i class="bi bi-trash3"></i> Delete
+                </button>
+              </form>
+            </td>
+
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Create New Agent Form ─────────────────────────────── -->
+  <div class="diq-card" style="border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,.09);">
+
+    <!-- Section header -->
+    <div style="padding:1.25rem 2rem;border-bottom:1px solid #E5E5EA;">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <div style="width:32px;height:32px;border-radius:8px;background:#EFF6FF;color:#2563EB;
+                    display:flex;align-items:center;justify-content:center;font-size:1rem;">
+          <i class="bi bi-person-plus-fill"></i>
+        </div>
+        <div>
+          <span style="font-size:1rem;font-weight:700;color:#1D1D1F;">Create New Agent</span>
+          <p style="font-size:0.8rem;color:#6E6E73;margin:0;">
+            Fill in the details below to add a new delivery agent to the system.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form body -->
+    <div style="padding:1.75rem 2rem;">
+      <form th:action="@{/admin/create-agent}" method="post">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+
+          <!-- Name -->
+          <div class="diq-form-group">
+            <label class="diq-label">Full name <span class="required">*</span></label>
+            <div class="diq-input-wrap">
+              <i class="bi bi-person input-icon"></i>
+              <input type="text" name="agentName" class="diq-input"
+                     placeholder="e.g. Rahul Sharma" required />
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="diq-form-group">
+            <label class="diq-label">Email <span class="required">*</span></label>
+            <div class="diq-input-wrap">
+              <i class="bi bi-envelope input-icon"></i>
+              <input type="email" name="agentEmail" class="diq-input"
+                     placeholder="e.g. rahul@deliveriq.com" required />
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="diq-form-group">
+            <label class="diq-label">Password <span class="required">*</span></label>
+            <div class="diq-input-wrap">
+              <i class="bi bi-lock input-icon"></i>
+              <input type="password" name="agentPassword" class="diq-input"
+                     placeholder="Set a password" required />
+            </div>
+          </div>
+
+          <!-- Phone -->
+          <div class="diq-form-group">
+            <label class="diq-label">Phone
+              <span style="font-size:0.75rem;font-weight:400;color:#6E6E73;margin-left:4px;">(optional)</span>
+            </label>
+            <div class="diq-input-wrap">
+              <i class="bi bi-phone input-icon"></i>
+              <input type="text" name="agentPhone" class="diq-input"
+                     placeholder="e.g. 9876543210" />
+            </div>
+          </div>
+
+          <!-- Zone -->
+          <div class="diq-form-group">
+            <label class="diq-label">Delivery zone
+              <span style="font-size:0.75rem;font-weight:400;color:#6E6E73;margin-left:4px;">(optional)</span>
+            </label>
+            <select name="agentZone" class="diq-select">
+              <option value="">No zone assigned</option>
+              <option value="NORTH">North</option>
+              <option value="SOUTH">South</option>
+              <option value="EAST">East</option>
+              <option value="WEST">West</option>
+              <option value="CENTRAL">Central</option>
+            </select>
+          </div>
+
+          <!-- Submit -->
+          <div class="diq-form-group" style="display:flex;align-items:flex-end;">
+            <button type="submit" class="diq-btn diq-btn-primary" style="width:100%;">
+              <i class="bi bi-person-plus"></i> Create Agent
+            </button>
+          </div>
+
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+</div>
+
+<div th:replace="~{fragments/layout :: scripts}"></div>
+</body>
+</html>

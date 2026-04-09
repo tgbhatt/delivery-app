@@ -7,6 +7,7 @@ import com.bt.deliveryapp.model.TimeSlot;
 import com.bt.deliveryapp.model.User;
 import com.bt.deliveryapp.repository.DeliveryRequestRepository;
 import com.bt.deliveryapp.repository.TimeSlotRepository;
+import com.bt.deliveryapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +64,34 @@ public class DeliveryBookingService {
     @Autowired
     private TimeSlotRepository timeSlotRepository;
 
+    /**
+     * We need UserRepository to re-fetch the User from the database.
+     *
+     * --- Why re-fetch? ---
+     * The User object comes from the HTTP session (stored during login).
+     * Objects in the session are "detached" — they are like photocopies
+     * of the database record, not live connections. Hibernate (our ORM)
+     * needs a "managed" (live) entity when saving a new DeliveryRequest
+     * with a @ManyToOne relationship to User. Re-fetching by ID gives
+     * us a fresh, managed User that Hibernate can work with properly.
+     */
+    @Autowired
+    private UserRepository userRepository;
+
+    /**
+     * We use RouteOptimisationService to automatically pick the best agent
+     * when a new order is placed — instead of leaving it unassigned for the admin.
+     *
+     * --- Why @Lazy? ---
+     * @Lazy tells Spring: "don't inject this bean at startup — wait until it's
+     * first actually used." This is a safety measure to prevent a circular
+     * dependency problem where two classes each try to load the other on startup.
+     * It is a common pattern when two service classes need to reference each other.
+     */
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private RouteOptimisationService routeOptimisationService;
+
     // ─────────────────────────────────────────────────────────────────────────
     //  METHOD 1: Place an Immediate Order (Order Now)
     // ─────────────────────────────────────────────────────────────────────────
@@ -92,6 +121,7 @@ public class DeliveryBookingService {
     @Transactional
     public DeliveryRequest placeImmediateOrder(User customer,
                                                String restaurantAddress,
+                                               String pickupZone,
                                                String customerAddress,
                                                String orderDescription) {
 
@@ -100,12 +130,19 @@ public class DeliveryBookingService {
         // we throw an IllegalArgumentException which will be caught by the Controller.
         validateOrderInputs(restaurantAddress, customerAddress, orderDescription);
 
+        // --- Re-fetch the User from the database ---
+        // The 'customer' parameter comes from the HTTP session and is "detached"
+        // (not connected to the current database session). We re-fetch it by ID
+        // so Hibernate gets a "managed" entity it can properly link via foreign key.
+        User managedCustomer = userRepository.findById(customer.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found. Please log in again."));
+
         // --- Create the delivery request ---
         // We use the "immediate" constructor from DeliveryRequest.java.
         // We pass Priority.HIGH because Order Now is always urgent,
         // and null for specialInstructions (the UI can add this later).
         DeliveryRequest order = new DeliveryRequest(
-                customer,
+                managedCustomer,
                 restaurantAddress,
                 customerAddress,
                 orderDescription,
@@ -113,16 +150,26 @@ public class DeliveryBookingService {
                 null               // no special instructions at this stage
         );
 
-        // --- Override status to PLACED ---
-        // The constructor already sets PLACED, but we set it explicitly here
-        // so the code is clear about what state an immediate order starts in.
+        // --- Save the pickup zone ---
+        // This tells RouteOptimisationService which zone this order is in,
+        // so it can prefer agents whose zone matches (e.g. NORTH agent for NORTH pickup).
+        order.setPickupZone(pickupZone);
+
+        // --- Set status to PLACED ---
         order.setStatus(DeliveryStatusEnum.PLACED);
 
-        // --- Save to database and return ---
-        // repository.save() does an INSERT if the object has no id yet,
-        // or an UPDATE if it already has an id. Since this is new, it INSERTs.
-        // After saving, the 'id' field in the returned object will be populated.
-        return deliveryRequestRepository.save(order);
+        // --- Save to database (INSERT) ---
+        // After this save, order.getId() is populated — the database assigned it an ID.
+        // We need that ID before we can call suggestBestAgent(orderId).
+        DeliveryRequest savedOrder = deliveryRequestRepository.save(order);
+
+        // --- Auto-assign the best available agent ---
+        // tryAutoAssign() asks RouteOptimisationService to pick the best agent
+        // and immediately assigns them, changing the status from PLACED → ASSIGNED.
+        // If no agents are available, the order stays PLACED for the admin to assign manually.
+        tryAutoAssign(savedOrder);
+
+        return savedOrder;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -156,12 +203,19 @@ public class DeliveryBookingService {
     @Transactional
     public DeliveryRequest placeScheduledOrder(User customer,
                                                String restaurantAddress,
+                                               String pickupZone,
                                                String customerAddress,
                                                String orderDescription,
                                                Long timeSlotId) {
 
         // --- Validate text inputs ---
         validateOrderInputs(restaurantAddress, customerAddress, orderDescription);
+
+        // --- Re-fetch the User from the database ---
+        // Same reason as in placeImmediateOrder() — the session User is detached,
+        // so we get a fresh managed copy from the database.
+        User managedCustomer = userRepository.findById(customer.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found. Please log in again."));
 
         // --- Find the chosen time slot ---
         // Optional<TimeSlot> is like a box that may or may not contain a TimeSlot.
@@ -188,7 +242,7 @@ public class DeliveryBookingService {
         // Scheduled orders are MEDIUM priority — they have a planned window,
         // so less urgent than immediate orders.
         DeliveryRequest order = new DeliveryRequest(
-                customer,
+                managedCustomer,   // use the re-fetched managed User, not the session copy
                 restaurantAddress,
                 customerAddress,
                 orderDescription,
@@ -197,20 +251,30 @@ public class DeliveryBookingService {
                 null               // no special instructions at this stage
         );
 
+        // --- Save the pickup zone ---
+        // Same as immediate orders: store the zone so the auto-assign algorithm
+        // can match this order with an agent who operates in the same area.
+        order.setPickupZone(pickupZone);
+
         // --- Override status to SCHEDULED ---
         // The constructor sets PLACED by default, but scheduled orders
         // should start as SCHEDULED to distinguish them clearly.
         order.setStatus(DeliveryStatusEnum.SCHEDULED);
 
         // --- Update the slot's booked count ---
-        // This is the business rule: consuming a slot means incrementing its count.
-        // If count reaches capacity, the slot is automatically marked unavailable
-        // inside the incrementBookedCount() method (we wrote this in TimeSlot.java).
         slot.incrementBookedCount();
-        timeSlotRepository.save(slot);   // save the updated slot
+        timeSlotRepository.save(slot);
 
-        // --- Save and return the order ---
-        return deliveryRequestRepository.save(order);
+        // --- Save to database ---
+        // Same pattern as immediate orders: save first to get the ID, then auto-assign.
+        DeliveryRequest savedOrder = deliveryRequestRepository.save(order);
+
+        // --- Auto-assign the best available agent ---
+        // For scheduled orders, we assign right away so the agent can plan ahead.
+        // If no agent is available, the order stays SCHEDULED for the admin to assign later.
+        tryAutoAssign(savedOrder);
+
+        return savedOrder;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -371,6 +435,68 @@ public class DeliveryBookingService {
         // deleteById() is provided free by JpaRepository — no need to write it ourselves
         deliveryRequestRepository.deleteById(orderId);
         return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  PRIVATE HELPER — Auto-assign best available agent
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Tries to automatically assign the best available agent to an order.
+     *
+     * This is called right after every new order is saved. It asks the
+     * RouteOptimisationService "who is the best agent for this order?"
+     * and if one is found, assigns them immediately.
+     *
+     * --- What "best" means ---
+     * RouteOptimisationService.suggestBestAgent() uses zone preference:
+     *   Step A: try agents whose zone matches the order's pickup zone
+     *   Step B: if none found, fall back to any available agent under the workload cap
+     *
+     * --- What happens if no agent is available? ---
+     * Nothing — the order stays in its current status (PLACED or SCHEDULED).
+     * The admin can assign manually from the dashboard later.
+     * We never throw an error here — a booking succeeding WITHOUT an agent
+     * assigned is perfectly valid; it just needs follow-up.
+     *
+     * --- Why private? ---
+     * This is an internal helper only used within this class.
+     * Making it private follows the Encapsulation principle — hide internal
+     * details that no other class needs to know about.
+     *
+     * @param order the newly saved order to assign an agent to
+     */
+    private void tryAutoAssign(DeliveryRequest order) {
+        try {
+            // Ask RouteOptimisationService to suggest the best agent
+            com.bt.deliveryapp.model.Agent bestAgent =
+                    routeOptimisationService.suggestBestAgent(order.getId());
+
+            if (bestAgent != null) {
+                // An agent was found — link them to the order
+                order.setAgent(bestAgent);
+
+                // Only advance to ASSIGNED for IMMEDIATE (Order Now) orders.
+                // A scheduled order already has a status of SCHEDULED — it is not
+                // being picked up right now, just assigned for a future time slot.
+                // Changing it to ASSIGNED would make it incorrectly appear in the
+                // agent's "Right Now" section instead of "Today's Schedule".
+                if (order.isImmediate()) {
+                    order.setStatus(DeliveryStatusEnum.ASSIGNED);
+                }
+
+                deliveryRequestRepository.save(order);
+            }
+            // If bestAgent is null, no agents are available — order stays unassigned
+        } catch (Exception e) {
+            // Temporarily print the error so we can diagnose why assignment is failing.
+            // Check the terminal where you ran the app — look for "AUTO-ASSIGN FAILED".
+            System.err.println("AUTO-ASSIGN FAILED for order #" + order.getId()
+                    + " — " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            e.printStackTrace();
+            // The order is already saved successfully — we just skip assignment.
+            // The admin can assign manually from the dashboard.
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

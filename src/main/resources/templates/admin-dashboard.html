@@ -23,7 +23,7 @@
     <div class="diq-stat-card">
       <div class="stat-icon stat-icon-blue"><i class="bi bi-lightning-charge-fill"></i></div>
       <div>
-        <div class="stat-value" data-count-to="${totalActive}" th:text="${totalActive}">0</div>
+        <div class="stat-value" th:data-count-to="${totalActive ?: 0}" th:text="${totalActive ?: 0}">0</div>
         <div class="stat-label">Total Active</div>
       </div>
     </div>
@@ -31,7 +31,7 @@
     <div class="diq-stat-card">
       <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle-fill"></i></div>
       <div>
-        <div class="stat-value" data-count-to="${deliveredToday}" th:text="${deliveredToday}">0</div>
+        <div class="stat-value" th:data-count-to="${deliveredToday ?: 0}" th:text="${deliveredToday ?: 0}">0</div>
         <div class="stat-label">Delivered Today</div>
       </div>
     </div>
@@ -39,7 +39,7 @@
     <div class="diq-stat-card">
       <div class="stat-icon stat-icon-red"><i class="bi bi-x-circle-fill"></i></div>
       <div>
-        <div class="stat-value" data-count-to="${failedToday}" th:text="${failedToday}">0</div>
+        <div class="stat-value" th:data-count-to="${failedToday ?: 0}" th:text="${failedToday ?: 0}">0</div>
         <div class="stat-label">Failed Today</div>
       </div>
     </div>
@@ -47,7 +47,7 @@
     <div class="diq-stat-card">
       <div class="stat-icon stat-icon-yellow"><i class="bi bi-person-plus-fill"></i></div>
       <div>
-        <div class="stat-value" data-count-to="${pendingAssignment}" th:text="${pendingAssignment}">0</div>
+        <div class="stat-value" th:data-count-to="${pendingAssignment ?: 0}" th:text="${pendingAssignment ?: 0}">0</div>
         <div class="stat-label">Pending Assignment</div>
       </div>
     </div>
@@ -83,11 +83,23 @@
         <label>Agent</label>
         <select name="agentId" class="diq-select">
           <option value="">All agents</option>
-          <option th:each="a : ${agents}"
+          <option th:each="a : ${allAgents}"
                   th:value="${a.id}"
                   th:text="${a.user.name}"
                   th:selected="${filterAgentId != null and filterAgentId == a.id}">
           </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Zone</label>
+        <select name="zone" class="diq-select">
+          <option value="">All zones</option>
+          <option value="NORTH"   th:selected="${filterZone == 'NORTH'}">North</option>
+          <option value="SOUTH"   th:selected="${filterZone == 'SOUTH'}">South</option>
+          <option value="EAST"    th:selected="${filterZone == 'EAST'}">East</option>
+          <option value="WEST"    th:selected="${filterZone == 'WEST'}">West</option>
+          <option value="CENTRAL" th:selected="${filterZone == 'CENTRAL'}">Central</option>
         </select>
       </div>
 
@@ -105,6 +117,21 @@
         </span>
       </div>
 
+    </form>
+  </div>
+
+  <!-- ── Run Auto-Assign Action ───────────────────────────── -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+    <p style="margin:0;font-size:0.875rem;color:#6B7280;">
+      Orders without an agent assigned are shown below.
+      Use the button to automatically assign available agents to them.
+    </p>
+    <form th:action="@{/admin/run-auto-assign}" method="post" style="margin:0;">
+      <button type="submit" class="diq-btn diq-btn-primary diq-btn-sm"
+              style="white-space:nowrap;"
+              onclick="return confirm('Run auto-assign on all unassigned orders?')">
+        <i class="bi bi-magic"></i> Run Auto-Assign
+      </button>
     </form>
   </div>
 
@@ -177,7 +204,7 @@
                     <input type="hidden" name="orderId" th:value="${order.id}" />
                     <select name="agentId" class="diq-select" style="padding:0.3rem 1.75rem 0.3rem 0.5rem;font-size:0.8rem;min-width:100px;">
                       <option value="">Assign…</option>
-                      <option th:each="a : ${agents}" th:value="${a.id}" th:text="${a.user.name}"></option>
+                      <option th:each="a : ${allAgents}" th:value="${a.id}" th:text="${a.user.name}"></option>
                     </select>
                     <button type="submit" class="diq-btn diq-btn-primary diq-btn-sm" disabled>
                       <i class="bi bi-check"></i>
@@ -257,7 +284,7 @@
                     <input type="hidden" name="orderId" th:value="${order.id}" />
                     <select name="agentId" class="diq-select" style="padding:0.3rem 1.75rem 0.3rem 0.5rem;font-size:0.8rem;min-width:100px;">
                       <option value="">Assign…</option>
-                      <option th:each="a : ${agents}" th:value="${a.id}" th:text="${a.user.name}"></option>
+                      <option th:each="a : ${allAgents}" th:value="${a.id}" th:text="${a.user.name}"></option>
                     </select>
                     <button type="submit" class="diq-btn diq-btn-primary diq-btn-sm" disabled>
                       <i class="bi bi-check"></i>
@@ -272,6 +299,16 @@
     </div>
 
   </div>
+
+  <!-- ── Agents shortcut ──────────────────────────────────────── -->
+  <div style="margin-top:2rem;text-align:center;">
+    <a th:href="@{/admin/agents}"
+       class="diq-btn diq-btn-secondary"
+       style="font-size:0.875rem;">
+      <i class="bi bi-people"></i> Manage Delivery Agents
+    </a>
+  </div>
+
 </div>
 
 <div th:replace="~{fragments/layout :: scripts}"></div>

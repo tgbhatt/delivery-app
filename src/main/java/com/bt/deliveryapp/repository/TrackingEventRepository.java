@@ -2,6 +2,7 @@ package com.bt.deliveryapp.repository;
 
 import com.bt.deliveryapp.model.DeliveryRequest;
 import com.bt.deliveryapp.model.TrackingEvent;
+import com.bt.deliveryapp.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -39,4 +40,10 @@ public interface TrackingEventRepository extends JpaRepository<TrackingEvent, Lo
     // Get the most recent event for a delivery — useful for showing "current status" quickly
     // "First" + "OrderByTimestampDesc" = the latest one
     Optional<TrackingEvent> findFirstByDeliveryRequestOrderByTimestampDesc(DeliveryRequest deliveryRequest);
+
+    // Find all tracking events where a specific user made the status update.
+    // Used when deleting an agent — we need to "unlink" their name from history
+    // before we can delete their User record from the database.
+    // SQL: SELECT * FROM tracking_events WHERE updated_by_user_id = ?
+    List<TrackingEvent> findByUpdatedBy(User updatedBy);
 }

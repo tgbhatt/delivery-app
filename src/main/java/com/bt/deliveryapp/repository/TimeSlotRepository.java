@@ -23,4 +23,9 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
 
     // Find all slots on a specific date (available or not) — used by admin
     List<TimeSlot> findBySlotDate(LocalDate slotDate);
+
+    // Find all AVAILABLE slots from a given date onwards — used by scheduling & rescheduling
+    // Spring auto-generates: SELECT * FROM time_slots WHERE slot_date >= ? AND available = true
+    // "GreaterThanEqual" means "on or after" — so this finds today's slots AND future ones
+    List<TimeSlot> findBySlotDateGreaterThanEqualAndAvailableTrue(LocalDate slotDate);
 }

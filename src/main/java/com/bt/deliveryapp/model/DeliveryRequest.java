@@ -64,7 +64,9 @@ public class DeliveryRequest {
     // ---- Is this an immediate order or a scheduled one? ----
     // true  = Order Now  → skip slot scheduling, go straight into the queue
     // false = Schedule for Later → run through the slot scheduling algorithm
-    @Column(nullable = false)
+    // We explicitly name the column "is_immediate" to prevent Hibernate
+    // from creating a duplicate column with a different name.
+    @Column(name = "is_immediate", nullable = false)
     private boolean isImmediate;
 
     // ---- Which time slot was assigned? ----
@@ -90,6 +92,12 @@ public class DeliveryRequest {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    // ---- Which zone is the pickup location in? ----
+    // Used by RouteOptimisationService to assign a nearby delivery agent
+    // e.g. "NORTH", "SOUTH", "CENTRAL" — nullable because zone may not always be known
+    @Column(length = 50)
+    private String pickupZone;
 
     // ---- Any special delivery instructions? ----
     // e.g. "Leave at door", "Call on arrival", "No contactless"
@@ -232,12 +240,47 @@ public class DeliveryRequest {
         this.updatedAt = updatedAt;
     }
 
+    public String getPickupZone() {
+        return pickupZone;
+    }
+
+    public void setPickupZone(String pickupZone) {
+        this.pickupZone = pickupZone;
+    }
+
     public String getSpecialInstructions() {
         return specialInstructions;
     }
 
     public void setSpecialInstructions(String specialInstructions) {
         this.specialInstructions = specialInstructions;
+    }
+
+    // ---- Alias getters for Thymeleaf templates ----
+    // The HTML templates were written using short, friendly field names like
+    // "pickupAddress" and "currentStatus". The actual model fields have longer,
+    // more descriptive names. These alias getters bridge that gap — Thymeleaf
+    // calls ${order.pickupAddress} which invokes getPickupAddress() below.
+    // This way the templates stay readable and we don't rename the real fields.
+
+    // Templates use: ${order.pickupAddress}
+    public String getPickupAddress() {
+        return restaurantAddress;
+    }
+
+    // Templates use: ${order.deliveryAddress}
+    public String getDeliveryAddress() {
+        return customerAddress;
+    }
+
+    // Templates use: ${order.packageDescription}
+    public String getPackageDescription() {
+        return orderDescription;
+    }
+
+    // Templates use: ${order.currentStatus}
+    public DeliveryStatusEnum getCurrentStatus() {
+        return status;
     }
 
     @Override
