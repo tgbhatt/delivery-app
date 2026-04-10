@@ -12,7 +12,16 @@
   <!-- Flash messages -->
   <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
 
+  <!-- ── Order not found ──────────────────────────────────── -->
+  <div th:unless="${order != null}" style="text-align:center;padding:4rem 1rem;">
+    <p style="font-size:3rem;margin:0;">📦</p>
+    <h2 style="font-size:1.25rem;font-weight:700;margin:1rem 0 0.5rem;">Order not found</h2>
+    <p style="color:#6E6E73;font-size:0.9375rem;" th:text="${errorMessage}">This order does not exist.</p>
+    <a href="/customer/orders" style="display:inline-block;margin-top:1.5rem;padding:0.6rem 1.4rem;background:#0071E3;color:#fff;border-radius:8px;text-decoration:none;font-size:0.9375rem;">Back to My Orders</a>
+  </div>
+
   <!-- ── Page Header ──────────────────────────────────────── -->
+  <div th:if="${order != null}">
   <div class="diq-page-header" style="margin-bottom:1.5rem;">
     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
       <div>
@@ -294,6 +303,8 @@
 <div id="map-data"
      th:attr="data-pickup=${order.pickupAddress}, data-delivery=${order.deliveryAddress}"
      style="display:none;"></div>
+
+</div> <!-- end th:if order != null -->
 
 <script>
 (function () {
