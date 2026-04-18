@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head(title='Recurring Schedules')}">
+</head>
+<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="diq-container">
+
+  <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
+
+  <!-- Page Header -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem;">
+    <div>
+      <p class="diq-label" style="margin-bottom:0.25rem;">Customer Portal</p>
+      <h1 style="font-size:1.625rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:0.25rem;">
+        <i class="bi bi-arrow-repeat me-2" style="color:#2563EB;"></i>Recurring Schedules
+      </h1>
+      <p style="font-size:0.9rem;color:#6E6E73;margin:0;">Deliveries that automatically repeat on a set schedule.</p>
+    </div>
+    <div style="display:flex;gap:0.625rem;flex-wrap:wrap;align-items:center;">
+      <a th:href="@{/customer/orders}"
+         style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;border-radius:20px;font-size:0.85rem;font-weight:600;background:#F5F5F7;color:#1D1D1F;text-decoration:none;">
+        <i class="bi bi-box-seam"></i> My Orders
+      </a>
+      <a th:href="@{/customer/past-orders}"
+         style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;border-radius:20px;font-size:0.85rem;font-weight:600;background:#F5F5F7;color:#1D1D1F;text-decoration:none;">
+        <i class="bi bi-clock-history"></i> Past Orders
+      </a>
+      <a th:href="@{/customer/recurring}"
+         style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;border-radius:20px;font-size:0.85rem;font-weight:600;background:#1D1D1F;color:white;text-decoration:none;">
+        <i class="bi bi-arrow-repeat"></i> Recurring
+      </a>
+      <a th:href="@{/customer/book}" class="diq-btn diq-btn-primary">
+        <i class="bi bi-plus-circle"></i> New Delivery
+      </a>
+    </div>
+  </div>
+
+  <!-- Info notice -->
+  <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:0.875rem 1.125rem;margin-bottom:1.5rem;display:flex;gap:0.75rem;align-items:flex-start;font-size:0.875rem;color:#1E40AF;">
+    <i class="bi bi-info-circle-fill" style="margin-top:1px;flex-shrink:0;"></i>
+    <span>Each active schedule automatically books a new delivery at 6 AM on the next due date, using the first available time slot. You can pause or cancel any schedule at any time.</span>
+  </div>
+
+  <!-- Empty State -->
+  <div th:if="${schedules == null or schedules.isEmpty()}" class="diq-card">
+    <div class="diq-empty" style="padding:4rem 2rem;">
+      <div class="empty-icon"><i class="bi bi-arrow-repeat"></i></div>
+      <p class="empty-title">No recurring schedules</p>
+      <p class="empty-desc">When you book a scheduled delivery, you can enable recurring to repeat it automatically.</p>
+      <a th:href="@{/customer/book}" class="diq-btn diq-btn-primary" style="margin-top:0.5rem;">
+        <i class="bi bi-plus-circle"></i> Book a delivery
+      </a>
+    </div>
+  </div>
+
+  <!-- Schedules Grid -->
+  <div th:unless="${schedules == null or schedules.isEmpty()}"
+       style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.25rem;">
+
+    <div th:each="sched : ${schedules}" class="diq-card diq-card-hover"
+         style="border-radius:16px;padding:1.375rem;display:flex;flex-direction:column;gap:1rem;">
+
+      <!-- Status + frequency -->
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span th:if="${sched.active}"
+                style="display:inline-flex;align-items:center;gap:0.35rem;background:#DCFCE7;color:#15803D;border-radius:20px;padding:0.25rem 0.75rem;font-size:0.775rem;font-weight:600;">
+            <i class="bi bi-circle-fill" style="font-size:0.45rem;"></i> Active
+          </span>
+          <span th:unless="${sched.active}"
+                style="display:inline-flex;align-items:center;gap:0.35rem;background:#F3F4F6;color:#6B7280;border-radius:20px;padding:0.25rem 0.75rem;font-size:0.775rem;font-weight:600;">
+            <i class="bi bi-pause-fill"></i> Paused
+          </span>
+          <span style="background:#EFF6FF;color:#2563EB;border-radius:20px;padding:0.25rem 0.75rem;font-size:0.775rem;font-weight:600;"
+                th:text="${sched.frequency.displayName}">WEEKLY</span>
+        </div>
+        <span style="font-size:0.775rem;color:#AEAEB2;" th:text="'#' + ${sched.id}">#1</span>
+      </div>
+
+      <!-- Route -->
+      <div style="display:flex;flex-direction:column;gap:0.5rem;">
+        <div style="display:flex;align-items:flex-start;gap:0.625rem;">
+          <i class="bi bi-geo-alt-fill" style="color:#2563EB;margin-top:1px;flex-shrink:0;"></i>
+          <div>
+            <p style="font-size:0.7rem;font-weight:600;color:#6E6E73;margin-bottom:0.1rem;">PICKUP</p>
+            <p style="font-size:0.8125rem;color:#1D1D1F;margin:0;" th:text="${sched.pickupAddress}">Pickup</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:0.625rem;">
+          <i class="bi bi-geo-alt-fill" style="color:#16A34A;margin-top:1px;flex-shrink:0;"></i>
+          <div>
+            <p style="font-size:0.7rem;font-weight:600;color:#6E6E73;margin-bottom:0.1rem;">DELIVERY</p>
+            <p style="font-size:0.8125rem;color:#1D1D1F;margin:0;" th:text="${sched.deliveryAddress}">Delivery</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Package + priority -->
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;color:#6E6E73;">
+        <i class="bi bi-box-seam"></i>
+        <span th:text="${sched.packageDescription}">Package</span>
+        <span style="color:#D1D5DB;">·</span>
+        <span th:text="${sched.priority != null ? sched.priority.name() : 'MEDIUM'}">PRIORITY</span>
+      </div>
+
+      <!-- Next run / end date -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.625rem;background:#F5F5F7;border-radius:10px;padding:0.75rem;">
+        <div>
+          <p style="font-size:0.7rem;font-weight:600;color:#6E6E73;margin-bottom:0.2rem;">NEXT RUN</p>
+          <p style="font-size:0.8125rem;color:#1D1D1F;margin:0;font-weight:600;"
+             th:text="${#temporals.format(sched.nextRunDate, 'dd MMM yyyy')}">Date</p>
+        </div>
+        <div>
+          <p style="font-size:0.7rem;font-weight:600;color:#6E6E73;margin-bottom:0.2rem;">ENDS</p>
+          <p style="font-size:0.8125rem;color:#1D1D1F;margin:0;"
+             th:text="${sched.endDate != null ? #temporals.format(sched.endDate,'dd MMM yyyy') : 'No end date'}">—</p>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:0.5rem;margin-top:auto;">
+        <form th:if="${sched.active}" th:action="@{'/customer/recurring/pause/' + ${sched.id}}" method="post" style="flex:1;">
+          <button type="submit" class="diq-btn diq-btn-secondary diq-btn-sm" style="width:100%;">
+            <i class="bi bi-pause-fill"></i> Pause
+          </button>
+        </form>
+        <form th:unless="${sched.active}" th:action="@{'/customer/recurring/resume/' + ${sched.id}}" method="post" style="flex:1;">
+          <button type="submit" class="diq-btn diq-btn-primary diq-btn-sm" style="width:100%;">
+            <i class="bi bi-play-fill"></i> Resume
+          </button>
+        </form>
+        <form th:action="@{'/customer/recurring/cancel/' + ${sched.id}}" method="post"
+              onsubmit="return confirm('Cancel this recurring schedule? This cannot be undone.');">
+          <button type="submit" class="diq-btn diq-btn-sm"
+                  style="background:#FEF2F2;color:#DC2626;border:1px solid rgba(220,38,38,.2);">
+            <i class="bi bi-x-circle"></i> Cancel
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div th:replace="~{fragments/layout :: scripts}"></div>
+</body>
+</html>

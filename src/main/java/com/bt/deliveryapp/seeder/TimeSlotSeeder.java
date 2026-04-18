@@ -96,43 +96,26 @@ public class TimeSlotSeeder implements CommandLineRunner {
      */
     @Override
     public void run(String... args) throws Exception {
+        LocalDate today = LocalDate.now();
+        int created = 0;
 
-        // If slots already exist, do nothing
-        long existingCount = timeSlotRepository.count();
-        if (existingCount > 0) {
-            System.out.println("[TimeSlotSeeder] Slots already exist (" + existingCount + " found). Skipping.");
-            return;
-        }
-
-        System.out.println("[TimeSlotSeeder] No slots found. Seeding time slots for the next " + DAYS_AHEAD + " days...");
-
-        // Loop through each day from today to 7 days from now
-        // LocalDate.now() gives today's date
-        // date.plusDays(i) adds i days to get a future date
+        // Check each day individually — ensures future days are always populated
+        // even if the app hasn't restarted in a while and old slots have passed
         for (int dayOffset = 0; dayOffset < DAYS_AHEAD; dayOffset++) {
+            LocalDate date = today.plusDays(dayOffset);
 
-            LocalDate date = LocalDate.now().plusDays(dayOffset);
-
-            // For each day, create one slot per time window
-            for (int i = 0; i < START_TIMES.length; i++) {
-
-                // Create a new TimeSlot object using the constructor we wrote
-                // in TimeSlot.java — it takes date, start, end, label, capacity
-                TimeSlot slot = new TimeSlot(
-                        date,
-                        START_TIMES[i],
-                        END_TIMES[i],
-                        LABELS[i],
-                        SLOT_CAPACITY
-                );
-
-                // Save it to the database
-                // repository.save() does an INSERT since this is a new object
-                timeSlotRepository.save(slot);
+            if (timeSlotRepository.findBySlotDate(date).isEmpty()) {
+                for (int i = 0; i < START_TIMES.length; i++) {
+                    timeSlotRepository.save(new TimeSlot(date, START_TIMES[i], END_TIMES[i], LABELS[i], SLOT_CAPACITY));
+                    created++;
+                }
             }
         }
 
-        // 4 windows × 7 days = 28 slots total
-        System.out.println("[TimeSlotSeeder] Done. Created " + (START_TIMES.length * DAYS_AHEAD) + " time slots.");
+        if (created > 0) {
+            System.out.println("[TimeSlotSeeder] Created " + created + " new time slots.");
+        } else {
+            System.out.println("[TimeSlotSeeder] All slots already exist. Nothing to seed.");
+        }
     }
 }
