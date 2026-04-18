@@ -123,7 +123,9 @@ public class DeliveryBookingService {
                                                String restaurantAddress,
                                                String pickupZone,
                                                String customerAddress,
-                                               String orderDescription) {
+                                               String orderDescription,
+                                               Priority priority,
+                                               String specialInstructions) {
 
         // --- Validation ---
         // We check the inputs before doing anything. If something is wrong,
@@ -141,13 +143,15 @@ public class DeliveryBookingService {
         // We use the "immediate" constructor from DeliveryRequest.java.
         // We pass Priority.HIGH because Order Now is always urgent,
         // and null for specialInstructions (the UI can add this later).
+        Priority effectivePriority = (priority != null) ? priority : Priority.HIGH;
+
         DeliveryRequest order = new DeliveryRequest(
                 managedCustomer,
                 restaurantAddress,
                 customerAddress,
                 orderDescription,
-                Priority.HIGH,     // immediate orders are always high priority
-                null               // no special instructions at this stage
+                effectivePriority,
+                specialInstructions
         );
 
         // --- Save the pickup zone ---
@@ -206,7 +210,9 @@ public class DeliveryBookingService {
                                                String pickupZone,
                                                String customerAddress,
                                                String orderDescription,
-                                               Long timeSlotId) {
+                                               Long timeSlotId,
+                                               Priority priority,
+                                               String specialInstructions) {
 
         // --- Validate text inputs ---
         validateOrderInputs(restaurantAddress, customerAddress, orderDescription);
@@ -241,14 +247,16 @@ public class DeliveryBookingService {
         // It sets: immediate = false, timeSlot = slot, createdAt = now.
         // Scheduled orders are MEDIUM priority — they have a planned window,
         // so less urgent than immediate orders.
+        Priority effectivePriority = (priority != null) ? priority : Priority.MEDIUM;
+
         DeliveryRequest order = new DeliveryRequest(
-                managedCustomer,   // use the re-fetched managed User, not the session copy
+                managedCustomer,
                 restaurantAddress,
                 customerAddress,
                 orderDescription,
-                Priority.MEDIUM,   // scheduled orders are medium priority
-                slot,              // the time slot the customer chose
-                null               // no special instructions at this stage
+                effectivePriority,
+                slot,
+                specialInstructions
         );
 
         // --- Save the pickup zone ---
@@ -383,11 +391,20 @@ public class DeliveryBookingService {
      * @return list of available slots on that date
      */
     public List<TimeSlot> getAvailableSlots(LocalDate date) {
-        // Calls the repository method we wrote in TimeSlotRepository:
-        //   findBySlotDateAndAvailableTrue(LocalDate date)
-        // Spring generates: SELECT * FROM time_slots
-        //                   WHERE slot_date = ? AND available = true
         return timeSlotRepository.findBySlotDateAndAvailableTrue(date);
+    }
+
+    // Single query for all available slots from a date onwards — avoids N queries in a loop
+    public List<TimeSlot> getAvailableSlotsFrom(LocalDate fromDate) {
+        return timeSlotRepository.findBySlotDateGreaterThanEqualAndAvailableTrue(fromDate);
+    }
+
+    // Fetch a specific order only if it belongs to the given customer
+    public Optional<DeliveryRequest> getOrderById(Long orderId, User customer) {
+        Optional<DeliveryRequest> opt = deliveryRequestRepository.findById(orderId);
+        if (opt.isEmpty()) return Optional.empty();
+        if (!opt.get().getCustomer().getId().equals(customer.getId())) return Optional.empty();
+        return opt;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

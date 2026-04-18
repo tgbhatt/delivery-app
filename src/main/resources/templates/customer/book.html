@@ -11,6 +11,13 @@
   <!-- Flash messages -->
   <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
 
+  <!-- Pre-fill notice (Book Again) -->
+  <div th:if="${prefillMessage != null}"
+       style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:0.875rem 1.125rem;margin-bottom:1.25rem;display:flex;gap:0.75rem;align-items:flex-start;font-size:0.875rem;color:#1E40AF;">
+    <i class="bi bi-arrow-repeat" style="margin-top:1px;flex-shrink:0;"></i>
+    <span th:text="${prefillMessage}"></span>
+  </div>
+
   <!-- ── Page Header ──────────────────────────────────────── -->
   <div class="diq-page-header">
     <p class="diq-label" style="margin-bottom:0.25rem;">
@@ -69,6 +76,7 @@
                 <input id="pickupAddress" name="pickupAddress" type="text"
                        class="diq-input"
                        placeholder="e.g. 12 Baker Street, Mumbai"
+                       th:value="${prefill != null ? prefill.restaurantAddress : ''}"
                        required />
               </div>
             </div>
@@ -77,11 +85,11 @@
               <label for="pickupZone" class="diq-label">Pickup zone <span class="required">*</span></label>
               <select id="pickupZone" name="pickupZone" class="diq-select" required>
                 <option value="">Which area is the pickup in?</option>
-                <option value="NORTH">North</option>
-                <option value="SOUTH">South</option>
-                <option value="EAST">East</option>
-                <option value="WEST">West</option>
-                <option value="CENTRAL">Central</option>
+                <option value="NORTH"   th:selected="${prefill != null and prefill.pickupZone == 'NORTH'}">North</option>
+                <option value="SOUTH"   th:selected="${prefill != null and prefill.pickupZone == 'SOUTH'}">South</option>
+                <option value="EAST"    th:selected="${prefill != null and prefill.pickupZone == 'EAST'}">East</option>
+                <option value="WEST"    th:selected="${prefill != null and prefill.pickupZone == 'WEST'}">West</option>
+                <option value="CENTRAL" th:selected="${prefill != null and prefill.pickupZone == 'CENTRAL'}">Central</option>
               </select>
             </div>
 
@@ -92,6 +100,7 @@
                 <input id="deliveryAddress" name="deliveryAddress" type="text"
                        class="diq-input"
                        placeholder="e.g. 47 Marine Drive, Mumbai"
+                       th:value="${prefill != null ? prefill.customerAddress : ''}"
                        required />
               </div>
             </div>
@@ -122,6 +131,7 @@
                 <input id="packageDescription" name="packageDescription" type="text"
                        class="diq-input"
                        placeholder="e.g. Electronics, documents, groceries…"
+                       th:value="${prefill != null ? prefill.orderDescription : ''}"
                        required />
               </div>
             </div>
@@ -130,9 +140,9 @@
               <label for="priority" class="diq-label">Priority <span class="required">*</span></label>
               <select id="priority" name="priority" class="diq-select" required>
                 <option value="">Select priority…</option>
-                <option value="HIGH">🔴 High</option>
-                <option value="MEDIUM">🟡 Medium</option>
-                <option value="LOW">⚪ Low</option>
+                <option value="HIGH"   th:selected="${prefill != null and prefill.priority.name() == 'HIGH'}">🔴 High</option>
+                <option value="MEDIUM" th:selected="${prefill != null and prefill.priority.name() == 'MEDIUM'}">🟡 Medium</option>
+                <option value="LOW"    th:selected="${prefill != null and prefill.priority.name() == 'LOW'}">⚪ Low</option>
               </select>
             </div>
 
@@ -144,7 +154,8 @@
               <textarea id="specialInstructions" name="specialInstructions"
                         class="diq-input diq-textarea"
                         rows="3"
-                        placeholder="Fragile, leave at door, ring bell…"></textarea>
+                        placeholder="Fragile, leave at door, ring bell…"
+                        th:text="${prefill != null ? prefill.specialInstructions : ''}"></textarea>
             </div>
 
           </div>
@@ -192,18 +203,115 @@
 
           </div>
 
-          <!-- Slot picker (only shown for Scheduled) -->
+          <!-- Slot picker + recurring (only shown for Scheduled) -->
           <div id="slotPicker" style="display:none;animation:panelIn 200ms ease forwards;">
-            <div class="diq-form-group">
+
+            <div class="diq-form-group" style="margin-bottom:1rem;">
               <label for="timeSlotId" class="diq-label">Choose a time slot <span class="required">*</span></label>
               <select id="timeSlotId" name="timeSlotId" class="diq-select">
                 <option value="">Select an available slot…</option>
                 <option th:each="slot : ${availableSlots}"
                         th:value="${slot.id}"
-                        th:text="${#temporals.format(slot.date,'EEE dd MMM')} + ' · ' + ${slot.startTime} + ' – ' + ${slot.endTime}">
+                        th:text="${#temporals.format(slot.slotDate,'EEE dd MMM')} + ' · ' + ${slot.startTime} + ' – ' + ${slot.endTime}">
                 </option>
               </select>
             </div>
+
+            <!-- ── Recurring toggle ───────────────────────── -->
+            <div style="border-top:1px solid #E5E5EA;padding-top:1rem;margin-top:0.5rem;">
+              <label style="display:flex;align-items:center;gap:0.625rem;cursor:pointer;font-size:0.9rem;font-weight:600;color:#1D1D1F;">
+                <input type="checkbox" id="recurringToggle" name="recurringEnabled"
+                       onchange="toggleRecurring(this.checked)"
+                       style="width:16px;height:16px;accent-color:#2563EB;" />
+                <i class="bi bi-arrow-repeat" style="color:#2563EB;"></i>
+                Make this a recurring delivery
+              </label>
+              <p style="font-size:0.8rem;color:#6E6E73;margin:0.25rem 0 0 1.5rem;">
+                Automatically repeat this delivery on a schedule.
+              </p>
+            </div>
+
+            <!-- ── Recurring options (revealed on toggle) ─── -->
+            <div id="recurringOptions" style="display:none;margin-top:1rem;background:#F5F5F7;border-radius:14px;padding:1.125rem;display:flex;flex-direction:column;gap:1rem;">
+
+              <div class="diq-form-group">
+                <label for="recurrenceFrequency" class="diq-label">Repeat frequency <span class="required">*</span></label>
+                <select id="recurrenceFrequency" name="recurrenceFrequency" class="diq-select"
+                        onchange="handleFrequencyChange(this.value)">
+                  <option value="">Choose how often…</option>
+                  <option value="DAILY">Every Day</option>
+                  <option value="EVERY_X_DAYS">Every X Days</option>
+                  <option value="SPECIFIC_DAYS_OF_WEEK">Specific Days of the Week</option>
+                  <option value="WEEKLY">Every Week</option>
+                  <option value="EVERY_2_WEEKS">Every 2 Weeks</option>
+                  <option value="EVERY_3_WEEKS">Every 3 Weeks</option>
+                  <option value="MONTHLY">Every Month</option>
+                  <option value="SPECIFIC_DATE_OF_MONTH">Specific Date of Month</option>
+                </select>
+              </div>
+
+              <!-- Every X days input -->
+              <div id="opt-interval" style="display:none;" class="diq-form-group">
+                <label for="recurrenceIntervalDays" class="diq-label">Repeat every how many days?</label>
+                <input type="number" id="recurrenceIntervalDays" name="recurrenceIntervalDays"
+                       class="diq-input" min="2" max="365" placeholder="e.g. 3" style="max-width:140px;" />
+              </div>
+
+              <!-- Specific days of the week -->
+              <div id="opt-days" style="display:none;" class="diq-form-group">
+                <label class="diq-label">Which days?</label>
+                <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.375rem;">
+                  <label style="cursor:pointer;">
+                    <input type="checkbox" name="recurrenceDaysOfWeek" value="MONDAY" style="display:none;" />
+                    <span class="day-pill" onclick="toggleDayPill(this)">Mon</span>
+                  </label>
+                  <label style="cursor:pointer;">
+                    <input type="checkbox" name="recurrenceDaysOfWeek" value="TUESDAY" style="display:none;" />
+                    <span class="day-pill" onclick="toggleDayPill(this)">Tue</span>
+                  </label>
+                  <label style="cursor:pointer;">
+                    <input type="checkbox" name="recurrenceDaysOfWeek" value="WEDNESDAY" style="display:none;" />
+                    <span class="day-pill" onclick="toggleDayPill(this)">Wed</span>
+                  </label>
+                  <label style="cursor:pointer;">
+                    <input type="checkbox" name="recurrenceDaysOfWeek" value="THURSDAY" style="display:none;" />
+                    <span class="day-pill" onclick="toggleDayPill(this)">Thu</span>
+                  </label>
+                  <label style="cursor:pointer;">
+                    <input type="checkbox" name="recurrenceDaysOfWeek" value="FRIDAY" style="display:none;" />
+                    <span class="day-pill" onclick="toggleDayPill(this)">Fri</span>
+                  </label>
+                  <label style="cursor:pointer;">
+                    <input type="checkbox" name="recurrenceDaysOfWeek" value="SATURDAY" style="display:none;" />
+                    <span class="day-pill" onclick="toggleDayPill(this)">Sat</span>
+                  </label>
+                  <label style="cursor:pointer;">
+                    <input type="checkbox" name="recurrenceDaysOfWeek" value="SUNDAY" style="display:none;" />
+                    <span class="day-pill" onclick="toggleDayPill(this)">Sun</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Specific date of month -->
+              <div id="opt-dom" style="display:none;" class="diq-form-group">
+                <label for="recurrenceDayOfMonth" class="diq-label">Day of month (1–31)</label>
+                <input type="number" id="recurrenceDayOfMonth" name="recurrenceDayOfMonth"
+                       class="diq-input" min="1" max="31" placeholder="e.g. 15" style="max-width:140px;" />
+                <p style="font-size:0.75rem;color:#6E6E73;margin:0.25rem 0 0;">If the date doesn't exist (e.g. Feb 30), the last day of the month is used.</p>
+              </div>
+
+              <!-- Optional end date -->
+              <div class="diq-form-group">
+                <label for="recurrenceEndDate" class="diq-label">
+                  End date
+                  <span style="font-size:0.75rem;font-weight:400;color:#6E6E73;margin-left:4px;">(optional — leave blank to repeat indefinitely)</span>
+                </label>
+                <input type="date" id="recurrenceEndDate" name="recurrenceEndDate"
+                       class="diq-input" style="max-width:200px;" />
+              </div>
+
+            </div>
+
           </div>
 
           <div style="display:flex;justify-content:space-between;margin-top:1.75rem;">
@@ -253,6 +361,11 @@
               </div>
             </div>
 
+            <div id="review-recurring-wrap" style="display:none;">
+              <p class="diq-label" style="margin-bottom:0.2rem;">Recurring</p>
+              <p id="review-recurring" style="font-size:0.875rem;color:#2563EB;margin:0;"></p>
+            </div>
+
             <div id="review-instructions-wrap" style="display:none;">
               <p class="diq-label" style="margin-bottom:0.2rem;">Instructions</p>
               <p id="review-instructions" style="font-size:0.875rem;color:#6E6E73;margin:0;font-style:italic;"></p>
@@ -277,67 +390,149 @@
 
 </div>
 
-<!-- Inline script for type toggle + review population -->
+<style>
+  .day-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    border: 1.5px solid #D1D5DB;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6E6E73;
+    background: white;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .day-pill.selected {
+    background: #2563EB;
+    border-color: #2563EB;
+    color: white;
+  }
+</style>
+
 <script>
+  // ── Prefill auto-select Scheduled ───────────────────────
+  (function() {
+    var hasPrefill = /*[[${prefill != null}]]*/ false;
+    if (hasPrefill) {
+      var radio = document.getElementById('typeScheduled');
+      if (radio) {
+        radio.checked = true;
+        handleTypeChange(radio);
+      }
+    }
+  })();
+
+  // ── Delivery type toggle ─────────────────────────────────
   function handleTypeChange(radio) {
-    const isImmediate = radio.value === 'true';
-    const slotPicker  = document.getElementById('slotPicker');
-    const labelImm    = document.getElementById('label-immediate');
-    const labelSched  = document.getElementById('label-scheduled');
+    var isImmediate = radio.value === 'true';
+    var slotPicker  = document.getElementById('slotPicker');
+    var labelImm    = document.getElementById('label-immediate');
+    var labelSched  = document.getElementById('label-scheduled');
 
     slotPicker.style.display = isImmediate ? 'none' : 'block';
 
     [labelImm, labelSched].forEach(function(l) {
-      l.style.border       = '2px solid #E5E5EA';
-      l.style.background   = 'white';
+      l.style.border     = '2px solid #E5E5EA';
+      l.style.background = 'white';
     });
+    var active = isImmediate ? labelImm : labelSched;
+    active.style.border     = '2px solid #2563EB';
+    active.style.background = '#EFF6FF';
 
-    const activeLabel = isImmediate ? labelImm : labelSched;
-    activeLabel.style.border     = '2px solid #2563EB';
-    activeLabel.style.background = '#EFF6FF';
+    // Hide recurring if switched to immediate
+    if (isImmediate) {
+      var tog = document.getElementById('recurringToggle');
+      if (tog) tog.checked = false;
+      toggleRecurring(false);
+    }
   }
 
-  function validateTypeStep() {
-    const radios  = document.querySelectorAll('[name="isImmediate"]');
-    const checked = Array.from(radios).find(r => r.checked);
+  // ── Recurring toggle ─────────────────────────────────────
+  function toggleRecurring(checked) {
+    var opts = document.getElementById('recurringOptions');
+    if (!opts) return;
+    opts.style.display = checked ? 'flex' : 'none';
     if (!checked) {
-      alert('Please select a delivery type.');
-      return;
+      var freq = document.getElementById('recurrenceFrequency');
+      if (freq) { freq.value = ''; handleFrequencyChange(''); }
     }
+  }
+
+  // ── Frequency sub-option reveal ──────────────────────────
+  function handleFrequencyChange(val) {
+    document.getElementById('opt-interval').style.display =
+      (val === 'EVERY_X_DAYS') ? 'block' : 'none';
+    document.getElementById('opt-days').style.display =
+      (val === 'SPECIFIC_DAYS_OF_WEEK') ? 'block' : 'none';
+    document.getElementById('opt-dom').style.display =
+      (val === 'SPECIFIC_DATE_OF_MONTH') ? 'block' : 'none';
+  }
+
+  // ── Day pill toggle ──────────────────────────────────────
+  function toggleDayPill(span) {
+    span.classList.toggle('selected');
+    var cb = span.parentElement.querySelector('input[type=checkbox]');
+    if (cb) cb.checked = span.classList.contains('selected');
+  }
+
+  // ── Step 3 validation ────────────────────────────────────
+  function validateTypeStep() {
+    var radios  = document.querySelectorAll('[name="isImmediate"]');
+    var checked = Array.from(radios).find(function(r) { return r.checked; });
+    if (!checked) { alert('Please select a delivery type.'); return; }
+
     if (checked.value === 'false') {
-      const slot = document.getElementById('timeSlotId');
+      var slot = document.getElementById('timeSlotId');
       if (!slot || !slot.value) {
         slot.classList.add('is-invalid');
         slot.focus();
         return;
       }
+
+      // Validate recurring options if enabled
+      var tog = document.getElementById('recurringToggle');
+      if (tog && tog.checked) {
+        var freq = document.getElementById('recurrenceFrequency');
+        if (!freq.value) { alert('Please choose a repeat frequency.'); freq.focus(); return; }
+        if (freq.value === 'EVERY_X_DAYS') {
+          var iv = document.getElementById('recurrenceIntervalDays');
+          if (!iv.value || parseInt(iv.value) < 2) { alert('Please enter the interval (minimum 2 days).'); iv.focus(); return; }
+        }
+        if (freq.value === 'SPECIFIC_DAYS_OF_WEEK') {
+          var anyChecked = document.querySelectorAll('[name="recurrenceDaysOfWeek"]:checked').length > 0;
+          if (!anyChecked) { alert('Please select at least one day of the week.'); return; }
+        }
+        if (freq.value === 'SPECIFIC_DATE_OF_MONTH') {
+          var dom = document.getElementById('recurrenceDayOfMonth');
+          if (!dom.value) { alert('Please enter the day of month.'); dom.focus(); return; }
+        }
+      }
     }
+
     populateReview();
     diqStepNext();
   }
 
+  // ── Populate review step ─────────────────────────────────
   function populateReview() {
-    function val(id) {
-      const el = document.getElementById(id);
-      return el ? el.value : '';
-    }
-    function setText(id, text) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = text || '—';
-    }
+    function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+    function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text || '—'; }
 
     setText('review-pickup',   val('pickupAddress'));
     setText('review-delivery', val('deliveryAddress'));
     setText('review-package',  val('packageDescription'));
     setText('review-priority', val('priority'));
 
-    const radios  = document.querySelectorAll('[name="isImmediate"]');
-    const checked = Array.from(radios).find(r => r.checked);
-    const isImm   = checked && checked.value === 'true';
+    var radios  = document.querySelectorAll('[name="isImmediate"]');
+    var checked = Array.from(radios).find(function(r) { return r.checked; });
+    var isImm   = checked && checked.value === 'true';
     setText('review-type', isImm ? '⚡ Immediate' : '📅 Scheduled');
 
-    const slotWrap = document.getElementById('review-slot-wrap');
-    const slotEl   = document.getElementById('timeSlotId');
+    var slotWrap = document.getElementById('review-slot-wrap');
+    var slotEl   = document.getElementById('timeSlotId');
     if (isImm) {
       if (slotWrap) slotWrap.style.display = 'none';
     } else {
@@ -347,9 +542,23 @@
       }
     }
 
-    const instrEl   = document.getElementById('specialInstructions');
-    const instrWrap = document.getElementById('review-instructions-wrap');
-    const instrText = instrEl ? instrEl.value.trim() : '';
+    // Recurring summary
+    var recWrap = document.getElementById('review-recurring-wrap');
+    var tog     = document.getElementById('recurringToggle');
+    if (tog && tog.checked && !isImm) {
+      var freq    = document.getElementById('recurrenceFrequency');
+      var freqTxt = freq && freq.selectedIndex > 0 ? freq.options[freq.selectedIndex].text : '';
+      if (freqTxt && recWrap) {
+        recWrap.style.display = 'block';
+        setText('review-recurring', '🔁 ' + freqTxt);
+      }
+    } else if (recWrap) {
+      recWrap.style.display = 'none';
+    }
+
+    var instrEl   = document.getElementById('specialInstructions');
+    var instrWrap = document.getElementById('review-instructions-wrap');
+    var instrText = instrEl ? instrEl.value.trim() : '';
     if (instrText && instrWrap) {
       instrWrap.style.display = 'block';
       setText('review-instructions', instrText);
