@@ -276,19 +276,17 @@
 
               <button type="submit"
                       class="diq-btn diq-btn-full diq-btn-sm"
-                      th:classappend="${nextStatus.name() == 'ARRIVED'}      ? 'diq-btn-primary'  :
-                                      ${nextStatus.name() == 'FAILED'}       ? 'diq-btn-danger'   :
-                                      ${nextStatus.name() == 'RESCHEDULED'}  ? 'diq-btn-warning'  :
-                                      'diq-btn-primary'">
+                      th:classappend="${nextStatus.name() == 'ARRIVED'    ? 'diq-btn-primary' :
+                                        nextStatus.name() == 'FAILED'     ? 'diq-btn-danger'  :
+                                        nextStatus.name() == 'RESCHEDULED'? 'diq-btn-warning' :
+                                        'diq-btn-primary'}">
                 <i class="bi"
-                   th:classappend="${nextStatus.name() == 'ARRIVED'}         ? 'bi-geo-alt-fill'  :
-                                   ${nextStatus.name() == 'FAILED'}          ? 'bi-x-circle'      :
-                                   ${nextStatus.name() == 'OUT_FOR_DELIVERY'}? 'bi-truck'         :
-                                   'bi-arrow-right'"></i>
+                   th:classappend="${nextStatus.name() == 'ARRIVED'          ? 'bi-geo-alt-fill' :
+                                    nextStatus.name() == 'FAILED'            ? 'bi-x-circle'     :
+                                    nextStatus.name() == 'OUT_FOR_DELIVERY'  ? 'bi-truck'        :
+                                    'bi-arrow-right'}"></i>
                 <!-- Custom label for ARRIVED, generic "Mark as X" for everything else -->
-                <span th:text="${nextStatus.name() == 'ARRIVED'}
-                                 ? 'I\'ve Arrived'
-                                 : 'Mark as ' + ${nextStatus.name().replace('_',' ')}">Update</span>
+                <span th:text="${nextStatus.name() == 'ARRIVED' ? 'I''ve Arrived' : 'Mark as ' + nextStatus.name().replace('_', ' ')}">Update</span>
               </button>
             </form>
           </div>
