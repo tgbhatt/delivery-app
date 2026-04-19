@@ -15,7 +15,8 @@ public enum DeliveryStatusEnum {
     SCHEDULED,         // A time slot has been assigned to this delivery
     ASSIGNED,          // A delivery agent has been assigned to pick it up
     OUT_FOR_DELIVERY,  // Agent is currently on the way to deliver it
-    DELIVERED,         // Successfully handed to the recipient
+    ARRIVED,           // Agent has reached the customer's address — OTP generated, waiting for confirmation
+    DELIVERED,         // OTP confirmed — successfully handed to the recipient
     FAILED,            // Delivery attempt was unsuccessful (nobody home, wrong address, etc.)
     RESCHEDULED        // A failed delivery has been given a new time slot
 }

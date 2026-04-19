@@ -56,6 +56,27 @@
     </div>
   </div>
 
+  <!-- ── OTP Banner (Customer only, when agent has arrived) ── -->
+  <!--
+    This section is ONLY visible to the customer (not the agent).
+    It shows the 4-digit code the customer should read aloud to their agent.
+    It disappears automatically once the order moves past ARRIVED status.
+  -->
+  <div th:if="${!isAgent and order.currentStatus.name() == 'ARRIVED'}"
+       style="background:#EFF6FF;border:2px solid #2563EB;border-radius:16px;padding:1.5rem 1.25rem;margin-bottom:1.5rem;text-align:center;">
+    <p style="font-size:0.875rem;font-weight:700;color:#2563EB;margin:0 0 0.4rem;">
+      <i class="bi bi-bell-fill me-1"></i> Your delivery agent has arrived!
+    </p>
+    <p style="font-size:0.875rem;color:#1D1D1F;margin:0 0 1rem;">
+      Read this code to your agent to confirm your delivery:
+    </p>
+    <div style="font-size:3.5rem;font-weight:800;letter-spacing:0.6rem;color:#1D1D1F;font-family:'SF Mono','Fira Code',monospace;margin-bottom:0.75rem;"
+         th:text="${order.deliveryOtp}">0000</div>
+    <p style="font-size:0.75rem;color:#6E6E73;margin:0;">
+      <i class="bi bi-shield-lock me-1"></i> Do not share this code with anyone else.
+    </p>
+  </div>
+
   <!-- ── Main grid ─────────────────────────────────────────── -->
   <div class="row g-4">
 
@@ -141,7 +162,76 @@
       </div>
 
       <!-- Agent action panel -->
-      <div th:if="${isAgent and validNextStatuses != null and !validNextStatuses.isEmpty()}"
+
+      <!--
+        ARRIVED status gets a special OTP panel instead of regular status buttons.
+        When the agent has arrived, they need to:
+          1. Ask the customer for their 4-digit OTP
+          2. Type it into the form below
+        OR mark the order as Failed if nobody is home.
+      -->
+      <div th:if="${isAgent and order.currentStatus.name() == 'ARRIVED'}"
+           class="diq-card" style="margin-top:1rem;">
+        <div class="diq-card-header">
+          <span style="font-size:0.9rem;font-weight:600;color:#1D1D1F;">
+            <i class="bi bi-shield-lock me-2" style="color:#2563EB;"></i>Confirm Delivery via OTP
+          </span>
+        </div>
+        <div class="diq-card-body" style="display:flex;flex-direction:column;gap:1rem;">
+
+          <!-- OTP entry form -->
+          <div style="background:#F5F5F7;border-radius:12px;padding:1rem;border:1px solid #E5E5EA;">
+            <p style="font-size:0.8rem;color:#6E6E73;margin:0 0 0.75rem;">
+              Ask the customer for their 4-digit OTP and enter it below:
+            </p>
+            <form th:action="@{'/track/' + ${order.id} + '/confirm-otp'}" method="post">
+              <div class="diq-form-group" style="margin-bottom:0.75rem;">
+                <label class="diq-label" style="margin-bottom:0.35rem;">Customer OTP</label>
+                <input class="diq-input"
+                       type="text"
+                       name="otp"
+                       maxlength="4"
+                       pattern="\d{4}"
+                       placeholder="e.g. 4821"
+                       required
+                       style="font-size:1.5rem;font-weight:700;letter-spacing:0.4rem;text-align:center;font-family:'SF Mono','Fira Code',monospace;" />
+              </div>
+              <button type="submit" class="diq-btn diq-btn-full diq-btn-sm diq-btn-success">
+                <i class="bi bi-check-circle"></i> Confirm Delivery
+              </button>
+            </form>
+          </div>
+
+          <!-- Failed option — if nobody is home -->
+          <div style="background:#FFF1F2;border-radius:12px;padding:1rem;border:1px solid #FECDD3;">
+            <p style="font-size:0.8rem;color:#6E6E73;margin:0 0 0.625rem;">
+              Nobody home? Mark as failed with a reason:
+            </p>
+            <form th:action="@{'/track/' + ${order.id} + '/update'}" method="post">
+              <input type="hidden" name="newStatus" value="FAILED" />
+              <div class="diq-form-group" style="margin-bottom:0.625rem;">
+                <textarea class="diq-input diq-textarea"
+                          name="note"
+                          rows="2"
+                          placeholder="e.g. Nobody answered the door"
+                          required></textarea>
+              </div>
+              <button type="submit" class="diq-btn diq-btn-full diq-btn-sm diq-btn-danger">
+                <i class="bi bi-x-circle"></i> Mark as Failed
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+
+      <!--
+        For all other statuses (PLACED, ASSIGNED, OUT_FOR_DELIVERY, FAILED, etc.),
+        show the regular status update buttons.
+        When status is OUT_FOR_DELIVERY, validNextStatuses = [ARRIVED], so this
+        renders a single "I've Arrived" button that posts to /arrive (not /update).
+      -->
+      <div th:if="${isAgent and order.currentStatus.name() != 'ARRIVED' and validNextStatuses != null and !validNextStatuses.isEmpty()}"
            class="diq-card" style="margin-top:1rem;">
         <div class="diq-card-header">
           <span style="font-size:0.9rem;font-weight:600;color:#1D1D1F;">
@@ -152,16 +242,31 @@
           <p style="font-size:0.8rem;color:#6E6E73;margin:0;">Select the next status and add a note:</p>
 
           <div th:each="nextStatus : ${validNextStatuses}">
-            <form th:action="@{'/track/' + ${order.id} + '/update'}" method="post"
+            <!--
+              Special case: when the next status is ARRIVED, the form must post to
+              /arrive (which generates the OTP) rather than the generic /update endpoint.
+              For all other statuses, the form posts to /update as normal.
+            -->
+            <form th:action="${nextStatus.name() == 'ARRIVED'}
+                               ? @{'/track/' + ${order.id} + '/arrive'}
+                               : @{'/track/' + ${order.id} + '/update'}"
+                  method="post"
                   style="background:#F5F5F7;border-radius:12px;padding:1rem;border:1px solid #E5E5EA;">
-              <input type="hidden" name="newStatus" th:value="${nextStatus.name()}" />
+
+              <!-- Only send newStatus param for non-ARRIVED transitions -->
+              <input th:unless="${nextStatus.name() == 'ARRIVED'}"
+                     type="hidden" name="newStatus" th:value="${nextStatus.name()}" />
 
               <div class="diq-form-group" style="margin-bottom:0.625rem;">
                 <label class="diq-label"
-                       th:text="${nextStatus.name().replace('_',' ')}
-                                + (${nextStatus.name() == 'FAILED' or nextStatus.name() == 'RESCHEDULED'} ? ' — Note required' : ' — Note (optional)')">
+                       th:text="${nextStatus.name() == 'ARRIVED'}
+                                  ? 'Confirm you have reached the delivery address'
+                                  : ${nextStatus.name().replace('_',' ')}
+                                    + (${nextStatus.name() == 'FAILED' or nextStatus.name() == 'RESCHEDULED'} ? ' — Note required' : ' — Note (optional)')">
                 </label>
-                <textarea class="diq-input diq-textarea"
+                <!-- No note field for the ARRIVED button — it's just a one-click action -->
+                <textarea th:unless="${nextStatus.name() == 'ARRIVED'}"
+                          class="diq-input diq-textarea"
                           name="note"
                           rows="2"
                           placeholder="Add a note…"
@@ -171,16 +276,19 @@
 
               <button type="submit"
                       class="diq-btn diq-btn-full diq-btn-sm"
-                      th:classappend="${nextStatus.name() == 'DELIVERED'      ? 'diq-btn-success' :
-                                       nextStatus.name() == 'FAILED'          ? 'diq-btn-danger'  :
-                                       nextStatus.name() == 'RESCHEDULED'     ? 'diq-btn-warning'  :
-                                       'diq-btn-primary'}">
+                      th:classappend="${nextStatus.name() == 'ARRIVED'}      ? 'diq-btn-primary'  :
+                                      ${nextStatus.name() == 'FAILED'}       ? 'diq-btn-danger'   :
+                                      ${nextStatus.name() == 'RESCHEDULED'}  ? 'diq-btn-warning'  :
+                                      'diq-btn-primary'">
                 <i class="bi"
-                   th:classappend="${nextStatus.name() == 'DELIVERED'      ? 'bi-check-circle'        :
-                                    nextStatus.name() == 'FAILED'          ? 'bi-x-circle'             :
-                                    nextStatus.name() == 'OUT_FOR_DELIVERY'? 'bi-truck'                :
-                                    'bi-arrow-right'}"></i>
-                <span th:text="'Mark as ' + ${nextStatus.name().replace('_',' ')}">Update</span>
+                   th:classappend="${nextStatus.name() == 'ARRIVED'}         ? 'bi-geo-alt-fill'  :
+                                   ${nextStatus.name() == 'FAILED'}          ? 'bi-x-circle'      :
+                                   ${nextStatus.name() == 'OUT_FOR_DELIVERY'}? 'bi-truck'         :
+                                   'bi-arrow-right'"></i>
+                <!-- Custom label for ARRIVED, generic "Mark as X" for everything else -->
+                <span th:text="${nextStatus.name() == 'ARRIVED'}
+                                 ? 'I\'ve Arrived'
+                                 : 'Mark as ' + ${nextStatus.name().replace('_',' ')}">Update</span>
               </button>
             </form>
           </div>
