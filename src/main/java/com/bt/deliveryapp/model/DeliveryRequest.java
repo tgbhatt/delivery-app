@@ -104,6 +104,17 @@ public class DeliveryRequest {
     @Column(length = 500)
     private String specialInstructions;
 
+    // ---- OTP fields for delivery confirmation ----
+    // When an agent clicks "I've Arrived", a 4-digit OTP is generated and stored here.
+    // The customer sees this OTP on their tracking page and reads it aloud to the agent.
+    // Once the agent enters the correct OTP, the order is marked DELIVERED.
+    // After delivery is confirmed (or failed), this is cleared back to null.
+    @Column(length = 4)
+    private String deliveryOtp;
+
+    // Records exactly when the OTP was generated — useful for expiry checks in the future.
+    private LocalDateTime otpGeneratedAt;
+
     // ---- Constructors ----
     public DeliveryRequest() {
     }
@@ -281,6 +292,22 @@ public class DeliveryRequest {
     // Templates use: ${order.currentStatus}
     public DeliveryStatusEnum getCurrentStatus() {
         return status;
+    }
+
+    public String getDeliveryOtp() {
+        return deliveryOtp;
+    }
+
+    public void setDeliveryOtp(String deliveryOtp) {
+        this.deliveryOtp = deliveryOtp;
+    }
+
+    public LocalDateTime getOtpGeneratedAt() {
+        return otpGeneratedAt;
+    }
+
+    public void setOtpGeneratedAt(LocalDateTime otpGeneratedAt) {
+        this.otpGeneratedAt = otpGeneratedAt;
     }
 
     @Override
