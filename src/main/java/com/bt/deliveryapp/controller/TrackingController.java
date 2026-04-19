@@ -249,8 +249,11 @@ public class TrackingController {
             trackingService.arriveAndGenerateOtp(orderId, loggedInUser);
             redirectAttributes.addFlashAttribute("successMessage",
                     "✅ Marked as Arrived! An OTP has been generated and is now visible on the customer's tracking page.");
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        } catch (Exception e) {
+            // Catch ALL exceptions (including database errors) so we never show
+            // a raw 500 page — always redirect back with a readable error message.
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Something went wrong: " + e.getMessage());
         }
 
         return "redirect:/track/" + orderId;
@@ -296,9 +299,9 @@ public class TrackingController {
             trackingService.confirmDeliveryWithOtp(orderId, otp, loggedInUser);
             redirectAttributes.addFlashAttribute("successMessage",
                     "✅ OTP confirmed! Order has been marked as Delivered.");
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            // Wrong OTP or wrong order state — show the error, stay on the page
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Something went wrong: " + e.getMessage());
         }
 
         return "redirect:/track/" + orderId;
