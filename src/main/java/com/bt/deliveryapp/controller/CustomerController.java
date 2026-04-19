@@ -41,7 +41,8 @@ public class CustomerController {
             DeliveryStatusEnum.PLACED,
             DeliveryStatusEnum.SCHEDULED,
             DeliveryStatusEnum.ASSIGNED,
-            DeliveryStatusEnum.OUT_FOR_DELIVERY
+            DeliveryStatusEnum.OUT_FOR_DELIVERY,
+            DeliveryStatusEnum.ARRIVED   // Agent is at the door — still an active order, OTP pending
     );
 
     private static final List<DeliveryStatusEnum> PAST_STATUSES = Arrays.asList(
