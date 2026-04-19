@@ -243,9 +243,11 @@ public class DashboardService {
                     // --- Case 1: Immediate order being actively handled ---
                     // ASSIGNED means the agent has been told to go pick it up.
                     // OUT_FOR_DELIVERY means they are already on the way to the customer.
+                    // ARRIVED means they are at the door waiting for OTP confirmation.
                     if (order.isImmediate()) {
                         return order.getStatus() == DeliveryStatusEnum.ASSIGNED
-                                || order.getStatus() == DeliveryStatusEnum.OUT_FOR_DELIVERY;
+                                || order.getStatus() == DeliveryStatusEnum.OUT_FOR_DELIVERY
+                                || order.getStatus() == DeliveryStatusEnum.ARRIVED;
                     }
 
                     // --- Case 2: Scheduled order whose time window is happening right now ---
