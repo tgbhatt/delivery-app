@@ -211,4 +211,99 @@ public class TrackingController {
         // Always redirect back to the tracking page (POST-Redirect-GET)
         return "redirect:/track/" + orderId;
     }
+
+    // =========================================================================
+    // POST /track/{orderId}/arrive — Agent clicked "I've Arrived"
+    // =========================================================================
+
+    /**
+     * Handles: POST /track/42/arrive
+     *
+     * This is called when the agent physically arrives at the customer's address
+     * and clicks the "I've Arrived" button. It triggers OTP generation in
+     * TrackingService and sets the order status to ARRIVED.
+     *
+     * After this, the customer's tracking page will display the OTP,
+     * and the agent's page will show an OTP entry form.
+     */
+    @PostMapping("/track/{orderId}/arrive")
+    public String agentArrived(@PathVariable Long orderId,
+                               HttpSession session,
+                               RedirectAttributes redirectAttributes) {
+
+        // Check login
+        User loggedInUser = (User) session.getAttribute("loggedInUser");
+        if (loggedInUser == null) {
+            return "redirect:/login";
+        }
+
+        // Only agents and admins can do this
+        if (loggedInUser.getRole() != UserRole.AGENT
+                && loggedInUser.getRole() != UserRole.ADMIN) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Only delivery agents can mark an order as Arrived.");
+            return "redirect:/track/" + orderId;
+        }
+
+        try {
+            trackingService.arriveAndGenerateOtp(orderId, loggedInUser);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "✅ Marked as Arrived! An OTP has been generated and is now visible on the customer's tracking page.");
+        } catch (Exception e) {
+            // Catch ALL exceptions (including database errors) so we never show
+            // a raw 500 page — always redirect back with a readable error message.
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Something went wrong: " + e.getMessage());
+        }
+
+        return "redirect:/track/" + orderId;
+    }
+
+    // =========================================================================
+    // POST /track/{orderId}/confirm-otp — Agent entered the customer's OTP
+    // =========================================================================
+
+    /**
+     * Handles: POST /track/42/confirm-otp
+     *
+     * Called when the agent submits the 4-digit OTP they got from the customer.
+     * TrackingService validates the OTP and, if correct, marks the order DELIVERED.
+     *
+     * If the OTP is wrong, an error message is shown and the agent can try again.
+     * The order stays in ARRIVED status until the correct OTP is entered or the
+     * agent marks it as FAILED.
+     *
+     * @param otp  the 4-digit code entered by the agent (from the form input)
+     */
+    @PostMapping("/track/{orderId}/confirm-otp")
+    public String confirmOtp(@PathVariable Long orderId,
+                             @RequestParam String otp,
+                             HttpSession session,
+                             RedirectAttributes redirectAttributes) {
+
+        // Check login
+        User loggedInUser = (User) session.getAttribute("loggedInUser");
+        if (loggedInUser == null) {
+            return "redirect:/login";
+        }
+
+        // Only agents and admins can confirm delivery
+        if (loggedInUser.getRole() != UserRole.AGENT
+                && loggedInUser.getRole() != UserRole.ADMIN) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Only delivery agents can confirm delivery.");
+            return "redirect:/track/" + orderId;
+        }
+
+        try {
+            trackingService.confirmDeliveryWithOtp(orderId, otp, loggedInUser);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "✅ OTP confirmed! Order has been marked as Delivered.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Incorrect OTP. Please try again.");
+        }
+
+        return "redirect:/track/" + orderId;
+    }
 }

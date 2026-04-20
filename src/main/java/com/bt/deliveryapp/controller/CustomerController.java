@@ -41,7 +41,8 @@ public class CustomerController {
             DeliveryStatusEnum.PLACED,
             DeliveryStatusEnum.SCHEDULED,
             DeliveryStatusEnum.ASSIGNED,
-            DeliveryStatusEnum.OUT_FOR_DELIVERY
+            DeliveryStatusEnum.OUT_FOR_DELIVERY,
+            DeliveryStatusEnum.ARRIVED
     );
 
     private static final List<DeliveryStatusEnum> PAST_STATUSES = Arrays.asList(

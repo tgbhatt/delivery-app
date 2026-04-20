@@ -2,10 +2,15 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head th:replace="~{fragments/layout :: head(title='Book a Delivery')}">
 </head>
-<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+<body class="diq-app">
 
-<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<aside th:replace="~{fragments/layout :: navbar}"></aside>
 
+<div class="diq-main">
+<header class="diq-topbar">
+  <span class="diq-topbar-title">Book a Delivery</span>
+</header>
+<div class="diq-content">
 <div class="diq-container-sm">
 
   <!-- Flash messages -->
@@ -307,6 +312,7 @@
                   <span style="font-size:0.75rem;font-weight:400;color:#6E6E73;margin-left:4px;">(optional — leave blank to repeat indefinitely)</span>
                 </label>
                 <input type="date" id="recurrenceEndDate" name="recurrenceEndDate"
+                       th:min="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}"
                        class="diq-input" style="max-width:200px;" />
               </div>
 
@@ -567,6 +573,10 @@
     }
   }
 </script>
+
+</div><!-- /diq-container-sm -->
+</div><!-- /diq-content -->
+</div><!-- /diq-main -->
 
 <div th:replace="~{fragments/layout :: scripts}"></div>
 </body>
