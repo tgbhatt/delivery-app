@@ -301,7 +301,7 @@ public class TrackingController {
                     "✅ OTP confirmed! Order has been marked as Delivered.");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("errorMessage",
-                    "Something went wrong: " + e.getMessage());
+                    "Incorrect OTP. Please try again.");
         }
 
         return "redirect:/track/" + orderId;

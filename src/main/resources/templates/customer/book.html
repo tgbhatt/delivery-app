@@ -312,6 +312,7 @@
                   <span style="font-size:0.75rem;font-weight:400;color:#6E6E73;margin-left:4px;">(optional — leave blank to repeat indefinitely)</span>
                 </label>
                 <input type="date" id="recurrenceEndDate" name="recurrenceEndDate"
+                       th:min="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}"
                        class="diq-input" style="max-width:200px;" />
               </div>
 
