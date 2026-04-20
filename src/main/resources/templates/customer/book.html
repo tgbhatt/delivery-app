@@ -2,10 +2,15 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head th:replace="~{fragments/layout :: head(title='Book a Delivery')}">
 </head>
-<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+<body class="diq-app">
 
-<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<aside th:replace="~{fragments/layout :: navbar}"></aside>
 
+<div class="diq-main">
+<header class="diq-topbar">
+  <span class="diq-topbar-title">Book a Delivery</span>
+</header>
+<div class="diq-content">
 <div class="diq-container-sm">
 
   <!-- Flash messages -->
@@ -567,6 +572,10 @@
     }
   }
 </script>
+
+</div><!-- /diq-container-sm -->
+</div><!-- /diq-content -->
+</div><!-- /diq-main -->
 
 <div th:replace="~{fragments/layout :: scripts}"></div>
 </body>

@@ -2,27 +2,29 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head th:replace="~{fragments/layout :: head(title='Manage Agents')}">
 </head>
-<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+<body class="diq-app">
 
-<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<aside th:replace="~{fragments/layout :: navbar}"></aside>
 
+<div class="diq-main">
+<header class="diq-topbar">
+  <span class="diq-topbar-title">Delivery Agents</span>
+  <div class="diq-topbar-actions">
+    <a th:href="@{/admin/dashboard}" class="diq-btn diq-btn-secondary diq-btn-sm">
+      <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+  </div>
+</header>
+<div class="diq-content">
 <div class="diq-container">
 
   <!-- Flash messages -->
   <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
 
   <!-- ── Page Header ──────────────────────────────────────── -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;">
-    <div>
-      <p class="diq-label" style="margin-bottom:0.25rem;">Admin</p>
-      <h1 style="font-size:1.625rem;font-weight:700;letter-spacing:-0.02em;margin:0;">
-        Delivery Agents
-      </h1>
-    </div>
-    <!-- Back to dashboard link -->
-    <a th:href="@{/admin/dashboard}" class="diq-btn diq-btn-secondary diq-btn-sm">
-      <i class="bi bi-arrow-left"></i> Back to Dashboard
-    </a>
+  <div style="margin-bottom:2rem;">
+    <p class="diq-label" style="margin-bottom:0.2rem;">Admin</p>
+    <p style="font-size:0.9rem;color:#7A8FA6;margin:0;">Create and manage delivery agents for your platform.</p>
   </div>
 
   <!-- ── Agents Table ──────────────────────────────────────── -->
@@ -250,7 +252,9 @@
 
   </div>
 
-</div>
+</div><!-- /diq-container -->
+</div><!-- /diq-content -->
+</div><!-- /diq-main -->
 
 <div th:replace="~{fragments/layout :: scripts}"></div>
 </body>

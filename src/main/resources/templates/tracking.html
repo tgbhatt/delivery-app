@@ -2,12 +2,16 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head th:replace="~{fragments/layout :: head(title='Track Delivery')}">
 </head>
-<body class="diq-page diq-body-offset" style="padding-bottom:3rem;">
+<body class="diq-app">
 
+<aside th:replace="~{fragments/layout :: navbar}"></aside>
 
-<nav th:replace="~{fragments/layout :: navbar}"></nav>
-
-<div class="diq-container-sm" style="margin-top:0.5rem;">
+<div class="diq-main">
+<header class="diq-topbar">
+  <span class="diq-topbar-title">Track Delivery</span>
+</header>
+<div class="diq-content">
+<div class="diq-container-sm">
 
   <!-- Flash messages -->
   <div th:replace="~{fragments/layout :: flash(successMessage=${successMessage}, errorMessage=${errorMessage})}"></div>
@@ -441,6 +445,10 @@
   frame.src = src;
 }());
 </script>
+
+</div><!-- /diq-container-sm -->
+</div><!-- /diq-content -->
+</div><!-- /diq-main -->
 
 <div th:replace="~{fragments/layout :: scripts}"></div>
 </body>
